@@ -20,7 +20,15 @@
       {
         "command": "vscode-gpt.suggestProjectChanges",
         "title": "Suggest Project Changes"
-      }
+      },
+      {
+        "command": "vscode-gpt.executeUserSpecifiedProjectChangesCommand",
+        "title": "Modify My Project"
+      },
+      {
+        "command": "vscode-gpt.executeUserSpecifiedCodeChangesCommand",
+        "title": "Modify My Code"
+      }            
     ],
     "configuration": {
       "type": "object",

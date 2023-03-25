@@ -58,10 +58,14 @@ const suggestDirectoryChangesSystemPrompt = 'You are a vscode extension which ha
 function strip_line_item(text : string) {
 	const listitemstart_regex = /^(\d+\.|-|\*)\s+/gm;
 	const backtick_regex = /`/gm;
-	const remove_ending_semicolon_regex = /;\s+/gm;
+	const remove_ending_semicolon_regex = /;/gm;
 	return text.replace(listitemstart_regex, '').replace(backtick_regex, '').replace(remove_ending_semicolon_regex, '').trim();
 }
 
+function cleanup_code_from_response(code : string) {
+	const backtick_regex = /`/gm;	
+	return code.replace(backtick_regex, '').trim()
+}
 
 async function getDirectoryJSON(uri: vscode.Uri): Promise<object> {
     const entries = await vscode.workspace.fs.readDirectory(uri);
@@ -82,12 +86,63 @@ async function getDirectoryJSON(uri: vscode.Uri): Promise<object> {
     return result;
 }
 
+function make_progress_options(message : string) {
+	const progressOptions: vscode.ProgressOptions = {
+		location: vscode.ProgressLocation.Window,
+		title: message,
+		cancellable: false
+	};
+	return progressOptions;
+};
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
 	const apiKey = vscode.workspace.getConfiguration().get('vscode-gpt.apiKey') as string;
 	const chatgptClient = new ChatGPTClient(apiKey);
+
+	let applyCodeGoals = async (picked_goal : string) => {
+
+		let activeWindowText = vscode.window.activeTextEditor?.document.getText();
+		let currentWindowFilename = vscode.window.activeTextEditor?.document.fileName;
+
+		const goalMessage = [
+			{
+					role: ChatCompletionRequestMessageRoleEnum.System,
+					content: executeGoalSystemPrompt
+			} as ChatCompletionRequestMessage,
+			{
+				role: ChatCompletionRequestMessageRoleEnum.User,
+				content: "The filename of the code is '" + currentWindowFilename + "'",
+			} as ChatCompletionRequestMessage,	
+			{
+				role: ChatCompletionRequestMessageRoleEnum.User,
+				content: "My goal is: " + picked_goal
+			},						
+			{
+				role: ChatCompletionRequestMessageRoleEnum.User,
+				content: activeWindowText,
+			} as ChatCompletionRequestMessage
+		];
+
+		const progressOptions = make_progress_options('Executing selected goal');
+
+		vscode.window.withProgress(progressOptions, async () => {
+			try{
+				const  { text, messageId } = await chatgptClient.respond(goalMessage);
+				let document = vscode.window.activeTextEditor?.document;
+				if (document != undefined) {
+					let edit = new vscode.WorkspaceEdit();
+					edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), cleanup_code_from_response(text as string));
+					vscode.workspace.applyEdit(edit);
+				}
+			}
+			catch  (error : any) {
+				vscode.window.showErrorMessage(`Error: ${error.message}`);
+			}
+		});
+	};
 
 	let suggestGoalsCommand = vscode.commands.registerCommand('vscode-gpt.suggestGoals', () => {
 
@@ -108,12 +163,8 @@ export function activate(context: vscode.ExtensionContext) {
 				content: "The filename of the code is '" + currentWindowFilename + "'",
 			} as ChatCompletionRequestMessage			
 		];
-		
-		const progressOptions: vscode.ProgressOptions = {
-			location: vscode.ProgressLocation.Window,
-			title: 'Generating goals for this code...',
-			cancellable: false
-		};
+
+		const progressOptions = make_progress_options('Generating goals for this code...');
 		  
 		vscode.window.withProgress(progressOptions,  async () => {
 			const  { text, messageId } = await chatgptClient.respond(generateGoalMessages)
@@ -121,52 +172,91 @@ export function activate(context: vscode.ExtensionContext) {
 			const picked_goal = await vscode.window.showQuickPick(
 				goal_options,
 				{ placeHolder: 'Pick a goal...' });
-
-			const goalMessage = [
-				{
-						role: ChatCompletionRequestMessageRoleEnum.System,
-						content: executeGoalSystemPrompt
-				} as ChatCompletionRequestMessage,
-				{
-					role: ChatCompletionRequestMessageRoleEnum.User,
-					content: "The filename of the code is '" + currentWindowFilename + "'",
-				} as ChatCompletionRequestMessage,	
-				{
-					role: ChatCompletionRequestMessageRoleEnum.User,
-					content: "My goal is: " + picked_goal
-				},						
-				{
-					role: ChatCompletionRequestMessageRoleEnum.User,
-					content: activeWindowText,
-				} as ChatCompletionRequestMessage
-			];
-
-			const progressOptions: vscode.ProgressOptions = {
-				location: vscode.ProgressLocation.Window,
-				title: 'Executing selected goal',
-				cancellable: false
-			};
 			
-			vscode.window.withProgress(progressOptions, async () => {
-				try{
-					const  { text, messageId } = await chatgptClient.respond(goalMessage);
-					let document = vscode.window.activeTextEditor?.document;
-					if (document != undefined) {
-						let edit = new vscode.WorkspaceEdit();
-						edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), text as string);
-						vscode.workspace.applyEdit(edit);
-					}
-				}
-				catch  (error : any) {
-					vscode.window.showErrorMessage(`Error: ${error.message}`);
-				}
-			});
+			if (picked_goal) {
+				await applyCodeGoals(picked_goal);
+			}
+			
 		});		
 	});
 
+	let generateAndExecuteProjectChanges = async (picked_goal : string) => {
+
+		let workspaceUri = vscode.workspace.workspaceFolders?.[0].uri!;
+
+		if (!workspaceUri) {
+			return;
+		}
+
+		let projectDirectoryJson = await getDirectoryJSON(workspaceUri);
+
+		if (!picked_goal) {
+			return;
+		}
+
+		const goalMessage = [
+			{
+					role: ChatCompletionRequestMessageRoleEnum.System,
+					content: generateDirectoryChangeCommandsSystemCommand
+			} as ChatCompletionRequestMessage,				
+			{
+				role: ChatCompletionRequestMessageRoleEnum.User,
+				content: "This is the layout of my project described as a JSON object:\n" +JSON.stringify(projectDirectoryJson),
+			} as ChatCompletionRequestMessage,
+			{
+				role: ChatCompletionRequestMessageRoleEnum.User,
+				content: "My goal is: " + picked_goal
+			}					
+		];
+
+		const progressOptions = make_progress_options('Generating project layout changes based on selected goal');
+		
+		vscode.window.withProgress(progressOptions, async () => {
+			vscode.window.showInformationMessage("executing goal");
+			try{
+				const  { text, messageId } = await chatgptClient.respond(goalMessage);
+				let document = vscode.window.activeTextEditor?.document;
+				const workspaceFolderPath = vscode.workspace.workspaceFolders?.[0].uri!;
+				if (workspaceFolderPath != undefined) {
+					// parse and implement commands
+					vscode.window.showInformationMessage(text as string);
+					let commands = text?.split("\n")!;
+					for (const command of commands) {
+						let cleanedCommand = strip_line_item(command);
+						if (cleanedCommand.indexOf(":") < 0) {
+							vscode.window.showInformationMessage("Skipping: " + cleanedCommand);
+							continue;								
+						}
+						let tokens = cleanedCommand.split(":");
+						let bytecode = tokens[0];
+						if (bytecode == "MOVE") {
+							vscode.window.showInformationMessage(cleanedCommand);
+							const srcUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
+							const destUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[2]);
+							await vscode.workspace.fs.rename(srcUri, destUri);
+						}
+						else if (bytecode == "NEWFILE") {
+							vscode.window.showInformationMessage(cleanedCommand);
+							const newFileUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
+							const newFileContent = "";
+							const data = Buffer.from(newFileContent, 'utf-8');
+							await vscode.workspace.fs.writeFile(newFileUri, data);
+						}
+						else if (bytecode == "NEWFOLDER") {
+							vscode.window.showInformationMessage(cleanedCommand);
+							const newDirectoryUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
+							await vscode.workspace.fs.createDirectory(newDirectoryUri);
+						}
+					}
+				}
+			}
+			catch  (error : any) {
+				vscode.window.showErrorMessage(`Error: ${error.message}`);
+			}
+		});	
+	};
+
 	let suggestProjectChanges = vscode.commands.registerCommand('vscode-gpt.suggestProjectChanges', () => {
-		let activeWindowText = vscode.window.activeTextEditor?.document.getText();
-		let currentWindowFilename = vscode.window.activeTextEditor?.document.fileName;
 		let workspaceUri = vscode.workspace.workspaceFolders?.[0].uri!;
 		const progressOptions: vscode.ProgressOptions = {
 			location: vscode.ProgressLocation.Window,
@@ -176,7 +266,6 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.withProgress(progressOptions,  async () => {
 
 			let projectDirectoryJson = await getDirectoryJSON(workspaceUri);
-			console.log(projectDirectoryJson);
 			const generateLayoutChangeGoalsMessages = [
 				{
 						role: ChatCompletionRequestMessageRoleEnum.System,
@@ -194,79 +283,47 @@ export function activate(context: vscode.ExtensionContext) {
 				goal_options,
 				{ placeHolder: 'Pick a goal...' });
 
-			if (!picked_goal) {
-				return;
+			if (picked_goal) {
+				await generateAndExecuteProjectChanges(picked_goal);
 			}
-
-			const goalMessage = [
-				{
-						role: ChatCompletionRequestMessageRoleEnum.System,
-						content: generateDirectoryChangeCommandsSystemCommand
-				} as ChatCompletionRequestMessage,				
-				{
-					role: ChatCompletionRequestMessageRoleEnum.User,
-					content: "This is the layout of my project described as a JSON object:\n" +JSON.stringify(projectDirectoryJson),
-				} as ChatCompletionRequestMessage,
-				{
-					role: ChatCompletionRequestMessageRoleEnum.User,
-					content: "My goal is: " + picked_goal
-				}					
-			];
-
-			const progressOptions: vscode.ProgressOptions = {
-				location: vscode.ProgressLocation.Window,
-				title: 'Generating project layout changes based on selected goal',
-				cancellable: false
-			};
-			
-			vscode.window.withProgress(progressOptions, async () => {
-				vscode.window.showInformationMessage("executing goal");
-				try{
-					const  { text, messageId } = await chatgptClient.respond(goalMessage);
-					let document = vscode.window.activeTextEditor?.document;
-					const workspaceFolderPath = vscode.workspace.workspaceFolders?.[0].uri!;
-					if (workspaceFolderPath != undefined) {
-						// parse and implement commands
-						vscode.window.showInformationMessage(text as string);
-						let commands = text?.split("\n")!;
-						for (const command of commands) {
-							let cleanedCommand = strip_line_item(command);
-							if (cleanedCommand.indexOf(":") < 0) {
-								vscode.window.showInformationMessage("Skipping: " + cleanedCommand);
-								continue;								
-							}
-							let tokens = cleanedCommand.split(":");
-							let bytecode = tokens[0];
-							if (bytecode == "MOVE") {
-								vscode.window.showInformationMessage(cleanedCommand);
-								const srcUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
-								const destUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[2]);
-								await vscode.workspace.fs.rename(srcUri, destUri);
-							}
-							else if (bytecode == "NEWFILE") {
-								vscode.window.showInformationMessage(cleanedCommand);
-								const newFileUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
-								const newFileContent = "";
-								const data = Buffer.from(newFileContent, 'utf-8');
-								await vscode.workspace.fs.writeFile(newFileUri, data);
-							}
-							else if (bytecode == "NEWFOLDER") {
-								vscode.window.showInformationMessage(cleanedCommand);
-								const newDirectoryUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
-								await vscode.workspace.fs.createDirectory(newDirectoryUri);
-							}
-						}
-					}
-				}
-				catch  (error : any) {
-					vscode.window.showErrorMessage(`Error: ${error.message}`);
-				}
-			});		
+	
+		});
 	});
+
+	
+	let executeUserSpecifiedCodeChangesCommand = vscode.commands.registerCommand('vscode-gpt.executeUserSpecifiedCodeChangesCommand', () => {
+		let inputBoxOptions = {
+			prompt: 'Describe how you would like to change this code:'
+		};
+
+		(async () => {
+			let userInput = await vscode.window.showInputBox(inputBoxOptions);
+			if (userInput) {
+				await applyCodeGoals(userInput);
+			}
+		})();
+
+	});
+
+	let executeUserSpecifiedProjectChangesCommand = vscode.commands.registerCommand('vscode-gpt.executeUserSpecifiedProjectChangesCommand', () => {
+		let inputBoxOptions = {
+			prompt: 'Describe how you would like to change the project file system:'
+		};
+
+		(async () => {
+			let userInput = await vscode.window.showInputBox(inputBoxOptions);
+			if (userInput) {
+				await generateAndExecuteProjectChanges(userInput);
+			}
+		})();
+
 	});
 
 	context.subscriptions.push(suggestGoalsCommand);
 	context.subscriptions.push(suggestProjectChanges);
+	context.subscriptions.push(executeUserSpecifiedCodeChangesCommand);
+	context.subscriptions.push(executeUserSpecifiedProjectChangesCommand);
+
 }
 
 // This method is called when your extension is deactivated
