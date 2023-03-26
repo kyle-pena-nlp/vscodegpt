@@ -1,51 +1,11 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+const constants = require("./constants.ts");
 import { OpenAIApi, Configuration, CreateChatCompletionRequest, ChatCompletionRequestMessage, ChatCompletionRequestMessageRoleEnum } from 'openai';
-const dirTree = require("directory-tree");
 
-class ChatGPTClient{
-    private openAI: OpenAIApi;
+import ChatGPTClient = require("./chat_gpt_client");
 
-    constructor(apiKey : string) {
-		
-        const configuration = new Configuration({
-            apiKey: apiKey,
-        });
-        this.openAI = new OpenAIApi(configuration);
-    }
-
-    async respond(chatGPTMessages: Array<ChatCompletionRequestMessage>) {
-        try {
-            if (!chatGPTMessages) {
-                return {
-                    text: 'No chatGPTMessages',
-                };
-            }
-
-            const request: CreateChatCompletionRequest = {
-                messages: chatGPTMessages,
-                model: 'gpt-3.5-turbo',
-       
-            };
-
-            const response = await this.openAI.createChatCompletion(request);
-            if (!response.data || !response.data.choices) {
-                
-                return {
-                    text: "The bot didn't respond. Please try again later.",
-                };
-            }
-
-            return {
-                text: response.data.choices[0].message?.content,
-                messageId: response.data.id,
-            };
-        } catch (error : any) {
-			throw error;
-        }
-    }
-}
 
 const only_list_instructions =  'When you respond, you will respond with only the bulleted list and you do not include other words, phrases, or sentences describing or explaining your response.  Do not explain the response.  Do not include any words, phrases or sentences introducing your response.  Do not include comments before or after the list items, even on the same line.  Do not number the responses.  This is very important.';
 const file_system_command_format_description = "`MOVE:X:Y'`;  This command moves the file or folder from path 'X' to path 'Y', where 'X' is the original path, and 'Y' is the new path, including the filenamne if the object being moved is a file.  `NEWFILE:X;` This command creates a new file with path 'X'.  `NEWFOLDER:'X';` This commands creates a new folder with path 'X'.  All paths in these emitted instructions are relative to the project directory root." 
@@ -99,7 +59,7 @@ function make_progress_options(message : string) {
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-	const apiKey = vscode.workspace.getConfiguration().get('vscode-gpt.apiKey') as string;
+	const apiKey = vscode.workspace.getConfiguration().get(`${constants.extname}.apiKey`) as string;
 	const chatgptClient = new ChatGPTClient(apiKey);
 
 	let applyCodeGoals = async (picked_goal : string) => {
@@ -144,7 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	};
 
-	let suggestGoalsCommand = vscode.commands.registerCommand('vscode-gpt.suggestGoals', () => {
+	let suggestGoalsCommand = vscode.commands.registerCommand(`${constants.extname}.suggestGoals`, () => {
 
 		let activeWindowText = vscode.window.activeTextEditor?.document.getText();
 		let currentWindowFilename = vscode.window.activeTextEditor?.document.fileName;
@@ -256,7 +216,7 @@ export function activate(context: vscode.ExtensionContext) {
 		});	
 	};
 
-	let suggestProjectChanges = vscode.commands.registerCommand('vscode-gpt.suggestProjectChanges', () => {
+	let suggestProjectChanges = vscode.commands.registerCommand(`${constants.extname}.suggestProjectChanges`, () => {
 		let workspaceUri = vscode.workspace.workspaceFolders?.[0].uri!;
 		const progressOptions: vscode.ProgressOptions = {
 			location: vscode.ProgressLocation.Window,
@@ -291,7 +251,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	
-	let executeUserSpecifiedCodeChangesCommand = vscode.commands.registerCommand('vscode-gpt.executeUserSpecifiedCodeChangesCommand', () => {
+	let executeUserSpecifiedCodeChangesCommand = vscode.commands.registerCommand(`${constants.extname}.executeUserSpecifiedCodeChangesCommand`, () => {
 		let inputBoxOptions = {
 			prompt: 'Describe how you would like to change this code:'
 		};
@@ -305,7 +265,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	});
 
-	let executeUserSpecifiedProjectChangesCommand = vscode.commands.registerCommand('vscode-gpt.executeUserSpecifiedProjectChangesCommand', () => {
+	let executeUserSpecifiedProjectChangesCommand = vscode.commands.registerCommand(`${constants.extname}.executeUserSpecifiedProjectChangesCommand`, () => {
 		let inputBoxOptions = {
 			prompt: 'Describe how you would like to change the project file system:'
 		};

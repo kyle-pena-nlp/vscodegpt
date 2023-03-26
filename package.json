@@ -18,26 +18,56 @@
         "title": "Suggest Goals"
       },
       {
-        "command": "vscode-gpt.suggestProjectChanges",
-        "title": "Suggest Project Changes"
+        "command": "stopAIassistantCommand",
+        "title": "Stop AI from background working on project"        
       },
       {
-        "command": "vscode-gpt.executeUserSpecifiedProjectChangesCommand",
-        "title": "Modify My Project"
+        "command": "startAIassistantCommand",
+        "title": "Start AI from background working on project"        
       },
       {
-        "command": "vscode-gpt.executeUserSpecifiedCodeChangesCommand",
-        "title": "Modify My Code"
-      }            
+        "command": "pickModelCommand",
+        "title": "Pick model"        
+      }
     ],
     "configuration": {
       "type": "object",
-      "title": "vscode-gpt apiKey",
+      "title": "vscode-gpt",
       "properties": {
         "vscode-gpt.apiKey": {
           "type": "string",
           "default": "",
           "description": "Your API key for ChatGPT (See: https://platform.openai.com/account/api-keys)"
+        },
+        "vscode-gpt.AI_goals": {
+          "type": "array",
+          "default": [],
+          "description": "Goals for your workspace"
+        },
+        "vscode-gpt.AI_deny_read_patterns": {
+          "type": "array",
+          "default": [],
+          "description": "Files and directories that AI is NOT permitted to read"
+        },
+        "vscode-gpt.AI_allow_read_patterns": {
+          "type": "array",
+          "default": [],
+          "description": "Files and directories that AI is permitted to read"
+        },
+        "vscode-gpt.AI_deny_write_patterns": {
+          "type": "array",
+          "default": [],
+          "description": "Files and directories that AI is permitted to write to"
+        },
+        "vscode-gpt.AI_allow_write_patterns": {
+          "type": "array",
+          "default": [],
+          "description": "Files and directories that AI is NOT permitted to write to"
+        },
+        "vscode-gpt.first_run": {
+          "type": "boolean",
+          "default": true,
+          "description": "Has the first-time initialization completed?"
         }
       }
     }
@@ -61,6 +91,7 @@
     "directory-tree": "^3.5.1",
     "eslint": "^8.34.0",
     "glob": "^8.1.0",
+    "minimatch": "^7.4.3",
     "mocha": "^10.2.0",
     "openai": "^3.2.1",
     "typescript": "^4.9.5"
