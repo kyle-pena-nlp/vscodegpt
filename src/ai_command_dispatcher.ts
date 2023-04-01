@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { Workspace } from "./workspace";
 import { UI } from "./ui";
 import { Permissions } from "./permissions";
+import { AICommand, AICommandExecutionResult } from './ai_command';
 
 /*
     1. DEFINEFILECONTENTS
@@ -12,6 +13,8 @@ import { Permissions } from "./permissions";
     6. READFILE
     7. CLARIFY
 */
+
+
 
 export class AICommandDispatcher {
 
@@ -25,34 +28,51 @@ export class AICommandDispatcher {
         this.permissions = new Permissions();
     }
 
-    async dispatch_commands(commands : Array<Array<string>>, definitions : Map<string,string>, context : Map<string,string>) {
-        for (const command of commands) {
-            await this.gather_definitions(command, definitions, context);
+    async dispatch_commands(commands : Array<AICommand>, definitions : Map<string,string>, context : Map<string,string>) {
+        try{
+            for (const command of commands) {
+                await this.gather_definitions(command, definitions, context);
+            }
+            for (const command of commands) {
+                await this.gather_context_command(command, definitions, context);
+            }
+            for (const command of commands) {
+                await this.execute_ui_command(command, definitions, context);
+            }
+            for (const command of commands) {
+                await this.execute_workspace_command(command, definitions, context);
+            }
+    
+            return {
+                success: true,
+                commands: commands,
+                definitions: definitions,
+                context: context
+            } as AICommandExecutionResult;
         }
-        for (const command of commands) {
-            await this.gather_context_command(command, definitions, context);
+        catch(e)  {
+            console.debug(e);
+            return {
+                success: false,
+                commands: commands,
+                definitions : definitions,
+                context: context
+            } as AICommandExecutionResult;
         }
-        for (const command of commands) {
-            await this.execute_ui_command(command, definitions, context);
-        }
-        for (const command of commands) {
-            await this.execute_workspace_command(command, definitions, context);
-        }
+
     }
 
-    async gather_definitions(command : Array<string>, definitions : Map<string,string>, context : Map<string,string>) {
-        const verb = command[0];
-        const arg1 = command[1];
-        const arg2 = command[2];  
+    async gather_definitions(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+        const verb = command.verb;
         if (verb == "DEFINEFILECONTENTS") {
+            const arg1 = command.arg1!;
+            const arg2 = command.arg2!;              
             definitions.set(arg1, arg2);
         }
     }
 
-    async gather_context_command(command : Array<string>, definitions : Map<string,string>, context : Map<string,string>) {
-        const verb = command[0];
-        const arg1 = command[1];
-        const arg2 = command[2];        
+    async gather_context_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+        const verb = command.verb;    
         if (verb == "READDIR") {
             const workspace_root = vscode.Uri.parse("./", false);
             const filesystem = await this.workspace.command_readdir(workspace_root);
@@ -64,6 +84,7 @@ export class AICommandDispatcher {
             }
         }
         else if (verb == "READFILE") {
+            const arg1 = command.arg1!;               
             const uri = vscode.Uri.parse(arg1, false);
             if (await this.permissions.maybeAskToReadFile(uri)) {
                 const file_contents = await this.workspace.command_readfile(uri);
@@ -75,11 +96,10 @@ export class AICommandDispatcher {
         }
     }
 
-    async execute_ui_command(command : Array<string>, definitions : Map<string,string>, context : Map<string,string>) {
-        const verb = command[0];
-        const arg1 = command[1];
-        const arg2 = command[2];
+    async execute_ui_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+        const verb = command.verb;
         if (verb == "CLARIFY") {
+            const arg1 = command.arg1!;
             const answer = ( await this.ui.ask_user_for_clarification(arg1) || "").trim();
             if (answer) {
                 context.set(arg1, answer);
@@ -87,11 +107,11 @@ export class AICommandDispatcher {
         }
     }
 
-    async execute_workspace_command(command : Array<string>, definitions : Map<string,string>, context : Map<string,string>) {
-        const verb = command[0];
-        const arg1 = command[1];
-        const arg2 = command[2];
+    async execute_workspace_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+        const verb = command.verb;
         if (verb == "MOVEFILE") {
+            const arg1 = command.arg1!;
+            const arg2 = command.arg2!;            
             const from = vscode.Uri.parse(arg1, false);
             const to = vscode.Uri.parse(arg2, false);
             if (await this.permissions.maybeAskToMove(from, to)) {
@@ -99,6 +119,8 @@ export class AICommandDispatcher {
             }
         }
         else if (verb == "CREATEFILE") {
+            const arg1 = command.arg1!;
+            const arg2 = command.arg2!;               
             const uri = vscode.Uri.parse(arg1, false);
             const content = definitions.get(arg2) || "";
             if (await this.permissions.maybeAskToCreateFile(uri)) {
@@ -106,6 +128,7 @@ export class AICommandDispatcher {
             }
         }
         else if (verb == "CREATEDIR") {
+            const arg1 = command.arg1!;          
             const uri = vscode.Uri.parse(arg1, false);
             if (await this.permissions.maybeAskToCreateDir(uri)) {
                 await this.workspace.command_createdir(uri);

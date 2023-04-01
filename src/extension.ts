@@ -1,288 +1,99 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-const constants = require("./constants.ts");
-import { OpenAIApi, Configuration, CreateChatCompletionRequest, ChatCompletionRequestMessage, ChatCompletionRequestMessageRoleEnum } from 'openai';
+import { CONSTANTS } from './constants';
+import { AIAssistanceWorker } from './ai_assistance_worker';
+import { UI } from "./ui";
+import { BackgroundProcess } from "./background_process";
+import { AICommandPanel } from "./ai_command_panel";
+import { maybe_do_first_run } from './first_run';
 
-import ChatGPTClient = require("./chat_gpt_client");
-
-
-const only_list_instructions =  'When you respond, you will respond with only the bulleted list and you do not include other words, phrases, or sentences describing or explaining your response.  Do not explain the response.  Do not include any words, phrases or sentences introducing your response.  Do not include comments before or after the list items, even on the same line.  Do not number the responses.  This is very important.';
-const file_system_command_format_description = "`MOVE:X:Y'`;  This command moves the file or folder from path 'X' to path 'Y', where 'X' is the original path, and 'Y' is the new path, including the filenamne if the object being moved is a file.  `NEWFILE:X;` This command creates a new file with path 'X'.  `NEWFOLDER:'X';` This commands creates a new folder with path 'X'.  All paths in these emitted instructions are relative to the project directory root." 
-const suggestGoalsSystemPrompt =  'You are a vscode extension which suggests development goals based on the code you are given by the user, with the filename of the code as auxilliary input. You respond with goals in a bulleted list.' + only_list_instructions;
-const executeGoalSystemPrompt = 'You are a vscode extension which provides revisions to code provided by the user according to the goal supplied by the user, with the filename of the code as auxilliary input.  You are revising the code the user sends you, but in a way that fulfills the user-provided goal. Your will respond with only the revised code.  Do not include any other words, phrases, or sentences describin or explaining your response.  Also, do not include the ``` before and after the code.  This is very important.';
-const generateDirectoryChangeCommandsSystemCommand = 'You are a vscode extension which has the power to create new file, create new folders, rename files, and rename folders, and modify file contents according to the goal provided by the user.  You accept a directory structure, code from the currently active file, and the filename of the currently active file as input.  As output, you emit a series of commands, one per line, with this format: ' + file_system_command_format_description + '. You must issue these commands in a logical order in order to fulfill the goal of the user.';
-const suggestDirectoryChangesSystemPrompt = 'You are a vscode extension which has the power to modify the files in a project.  The user will provide you with JSON which describes the current project file system, and you will suggest changes to which files and folders are currently in the project, including renaming files and folders, or creating new files and folders.  Please suggest changes which conform to common practices and best practices according to the types of files and folders that the user has described.' + only_list_instructions;
-
-
-function strip_line_item(text : string) {
-	const listitemstart_regex = /^(\d+\.|-|\*)\s+/gm;
-	const backtick_regex = /`/gm;
-	const remove_ending_semicolon_regex = /;/gm;
-	return text.replace(listitemstart_regex, '').replace(backtick_regex, '').replace(remove_ending_semicolon_regex, '').trim();
-}
-
-function cleanup_code_from_response(code : string) {
-	const backtick_regex = /`/gm;	
-	return code.replace(backtick_regex, '').trim()
-}
-
-async function getDirectoryJSON(uri: vscode.Uri): Promise<object> {
-    const entries = await vscode.workspace.fs.readDirectory(uri);
-    const result : Record<string,any> = {};
-
-    for (const [entryName, entryType] of entries) {
-        const entryUri = vscode.Uri.joinPath(uri, entryName);
-
-        if (entryType === vscode.FileType.Directory) {
-            result[entryName] = await getDirectoryJSON(entryUri);
-        } else if (entryType === vscode.FileType.File) {
-            result[entryName] = 'file';
-        } else {
-            result[entryName] = 'unknown';
-        }
-    }
-
-    return result;
-}
-
-function make_progress_options(message : string) {
-	const progressOptions: vscode.ProgressOptions = {
-		location: vscode.ProgressLocation.Window,
-		title: message,
-		cancellable: false
-	};
-	return progressOptions;
-};
+function wait(ms: number) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        console.log("Done waiting");
+        resolve(ms)
+      }, ms )
+    })
+  };  
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-	const apiKey = vscode.workspace.getConfiguration().get(`${constants.extname}.apiKey`) as string;
-	const chatgptClient = new ChatGPTClient(apiKey);
 
-	let applyCodeGoals = async (picked_goal : string) => {
+	const apiKey = vscode.workspace.getConfiguration().get(`${CONSTANTS.extname}.apiKey`) as string;
+	const ai_assistance_worker = new AIAssistanceWorker(apiKey);
+  const ui = new UI();
+    
+  const poll_ai_assistant = async () => { console.log("hi!"); }; //async () => await ai_assistance_worker.poll();
+  const assistance_process = new BackgroundProcess("assistant_process", 3000, poll_ai_assistant);
 
-		let activeWindowText = vscode.window.activeTextEditor?.document.getText();
-		let currentWindowFilename = vscode.window.activeTextEditor?.document.fileName;
-
-		const goalMessage = [
-			{
-					role: ChatCompletionRequestMessageRoleEnum.System,
-					content: executeGoalSystemPrompt
-			} as ChatCompletionRequestMessage,
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: "The filename of the code is '" + currentWindowFilename + "'",
-			} as ChatCompletionRequestMessage,	
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: "My goal is: " + picked_goal
-			},						
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: activeWindowText,
-			} as ChatCompletionRequestMessage
-		];
-
-		const progressOptions = make_progress_options('Executing selected goal');
-
-		vscode.window.withProgress(progressOptions, async () => {
-			try{
-				const  { text, messageId } = await chatgptClient.respond(goalMessage);
-				let document = vscode.window.activeTextEditor?.document;
-				if (document != undefined) {
-					let edit = new vscode.WorkspaceEdit();
-					edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), cleanup_code_from_response(text as string));
-					vscode.workspace.applyEdit(edit);
-				}
-			}
-			catch  (error : any) {
-				vscode.window.showErrorMessage(`Error: ${error.message}`);
-			}
-		});
-	};
-
-	let suggestGoalsCommand = vscode.commands.registerCommand(`${constants.extname}.suggestGoals`, () => {
-
-		let activeWindowText = vscode.window.activeTextEditor?.document.getText();
-		let currentWindowFilename = vscode.window.activeTextEditor?.document.fileName;
-		
-		const generateGoalMessages = [
-			{
-					role: ChatCompletionRequestMessageRoleEnum.System,
-					content: suggestGoalsSystemPrompt
-			} as ChatCompletionRequestMessage,
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: activeWindowText,
-			} as ChatCompletionRequestMessage,
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: "The filename of the code is '" + currentWindowFilename + "'",
-			} as ChatCompletionRequestMessage			
-		];
-
-		const progressOptions = make_progress_options('Generating goals for this code...');
-		  
-		vscode.window.withProgress(progressOptions,  async () => {
-			const  { text, messageId } = await chatgptClient.respond(generateGoalMessages)
-			let goal_options = text?.split("\n") as string[];
-			const picked_goal = await vscode.window.showQuickPick(
-				goal_options,
-				{ placeHolder: 'Pick a goal...' });
-			
-			if (picked_goal) {
-				await applyCodeGoals(picked_goal);
-			}
-			
-		});		
+	let suggestGoalsCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.suggestGoals`, () => {
+		//TODO: ai_assistance_worker.suggest_goals();	
 	});
 
-	let generateAndExecuteProjectChanges = async (picked_goal : string) => {
+    let stopAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.stopAIassistant`, () => {
+        assistance_process.stop();
+    });
 
-		let workspaceUri = vscode.workspace.workspaceFolders?.[0].uri!;
+    let startAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.startAIassistant`, () => {
+        assistance_process.start();
+    });    
 
-		if (!workspaceUri) {
-			return;
-		}
+    let doShowWebViewPanel = async () =>  {
 
-		let projectDirectoryJson = await getDirectoryJSON(workspaceUri);
+      console.log("rendering panel")
 
-		if (!picked_goal) {
-			return;
-		}
+      const panel = vscode.window.createWebviewPanel(
+        'actionApproval',
+        'Action Approval',
+        vscode.ViewColumn.One,
+        { enableScripts: true }
+      );
+  
+      const actions = [
+        { id: 1, description: 'Create a new file' },
+        { id: 2, description: 'Delete a file' },
+        { id: 3, description: 'Rename a file' },
+      ];
+  
+      panel.webview.html = showWebViewPanel(actions);
+  
+      panel.webview.onDidReceiveMessage(async (message) => {
+        switch (message.command) {
+          case 'approve':
+            console.log(`Action approved: ${message.id}`);
+            break;
+          case 'reject':
+            console.log(`Action rejected: ${message.id}`);
+            break;
+        }
+      });
+    };
 
-		const goalMessage = [
-			{
-					role: ChatCompletionRequestMessageRoleEnum.System,
-					content: generateDirectoryChangeCommandsSystemCommand
-			} as ChatCompletionRequestMessage,				
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: "This is the layout of my project described as a JSON object:\n" +JSON.stringify(projectDirectoryJson),
-			} as ChatCompletionRequestMessage,
-			{
-				role: ChatCompletionRequestMessageRoleEnum.User,
-				content: "My goal is: " + picked_goal
-			}					
-		];
+    let showWebViewCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.showWebView`, async () => {
+      console.log("Executing command");
+        await doShowWebViewPanel();
+      });    
 
-		const progressOptions = make_progress_options('Generating project layout changes based on selected goal');
-		
-		vscode.window.withProgress(progressOptions, async () => {
-			vscode.window.showInformationMessage("executing goal");
-			try{
-				const  { text, messageId } = await chatgptClient.respond(goalMessage);
-				let document = vscode.window.activeTextEditor?.document;
-				const workspaceFolderPath = vscode.workspace.workspaceFolders?.[0].uri!;
-				if (workspaceFolderPath != undefined) {
-					// parse and implement commands
-					vscode.window.showInformationMessage(text as string);
-					let commands = text?.split("\n")!;
-					for (const command of commands) {
-						let cleanedCommand = strip_line_item(command);
-						if (cleanedCommand.indexOf(":") < 0) {
-							vscode.window.showInformationMessage("Skipping: " + cleanedCommand);
-							continue;								
-						}
-						let tokens = cleanedCommand.split(":");
-						let bytecode = tokens[0];
-						if (bytecode == "MOVE") {
-							vscode.window.showInformationMessage(cleanedCommand);
-							const srcUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
-							const destUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[2]);
-							await vscode.workspace.fs.rename(srcUri, destUri);
-						}
-						else if (bytecode == "NEWFILE") {
-							vscode.window.showInformationMessage(cleanedCommand);
-							const newFileUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
-							const newFileContent = "";
-							const data = Buffer.from(newFileContent, 'utf-8');
-							await vscode.workspace.fs.writeFile(newFileUri, data);
-						}
-						else if (bytecode == "NEWFOLDER") {
-							vscode.window.showInformationMessage(cleanedCommand);
-							const newDirectoryUri = vscode.Uri.joinPath(workspaceFolderPath, tokens[1]);
-							await vscode.workspace.fs.createDirectory(newDirectoryUri);
-						}
-					}
-				}
-			}
-			catch  (error : any) {
-				vscode.window.showErrorMessage(`Error: ${error.message}`);
-			}
-		});	
-	};
+    let pickModelCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.pickModel`, async () => {
+        const model = await ui.pick_model();
+        if (model) {
+            ai_assistance_worker.set_model(model);
+        }
+    }); 
 
-	let suggestProjectChanges = vscode.commands.registerCommand(`${constants.extname}.suggestProjectChanges`, () => {
-		let workspaceUri = vscode.workspace.workspaceFolders?.[0].uri!;
-		const progressOptions: vscode.ProgressOptions = {
-			location: vscode.ProgressLocation.Window,
-			title: 'Generating layout suggestions for this project',
-			cancellable: false
-		};
-		vscode.window.withProgress(progressOptions,  async () => {
-
-			let projectDirectoryJson = await getDirectoryJSON(workspaceUri);
-			const generateLayoutChangeGoalsMessages = [
-				{
-						role: ChatCompletionRequestMessageRoleEnum.System,
-						content: suggestDirectoryChangesSystemPrompt
-				} as ChatCompletionRequestMessage,
-				{
-					role: ChatCompletionRequestMessageRoleEnum.User,
-					content: "This is the layout of my project described as a JSON object:\n" + JSON.stringify(projectDirectoryJson),
-				} as ChatCompletionRequestMessage,		
-			];
-
-			const  { text, messageId } = await chatgptClient.respond(generateLayoutChangeGoalsMessages)
-			let goal_options = text?.split("\n") as string[];
-			const picked_goal = await vscode.window.showQuickPick(
-				goal_options,
-				{ placeHolder: 'Pick a goal...' });
-
-			if (picked_goal) {
-				await generateAndExecuteProjectChanges(picked_goal);
-			}
-	
-		});
-	});
-
-	
-	let executeUserSpecifiedCodeChangesCommand = vscode.commands.registerCommand(`${constants.extname}.executeUserSpecifiedCodeChangesCommand`, () => {
-		let inputBoxOptions = {
-			prompt: 'Describe how you would like to change this code:'
-		};
-
-		(async () => {
-			let userInput = await vscode.window.showInputBox(inputBoxOptions);
-			if (userInput) {
-				await applyCodeGoals(userInput);
-			}
-		})();
-
-	});
-
-	let executeUserSpecifiedProjectChangesCommand = vscode.commands.registerCommand(`${constants.extname}.executeUserSpecifiedProjectChangesCommand`, () => {
-		let inputBoxOptions = {
-			prompt: 'Describe how you would like to change the project file system:'
-		};
-
-		(async () => {
-			let userInput = await vscode.window.showInputBox(inputBoxOptions);
-			if (userInput) {
-				await generateAndExecuteProjectChanges(userInput);
-			}
-		})();
-
-	});
-
+  context.subscriptions.push(showWebViewCommand);
 	context.subscriptions.push(suggestGoalsCommand);
-	context.subscriptions.push(suggestProjectChanges);
-	context.subscriptions.push(executeUserSpecifiedCodeChangesCommand);
-	context.subscriptions.push(executeUserSpecifiedProjectChangesCommand);
+	context.subscriptions.push(stopAIassistantCommand);
+	context.subscriptions.push(startAIassistantCommand);
+	context.subscriptions.push(pickModelCommand);
+
+
+  vscode.commands.executeCommand(`${CONSTANTS.extname}.showWebView`);
+
+  maybe_do_first_run();
 
 }
 

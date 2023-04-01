@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-const constants = require("./constants");
+import { CONSTANTS } from './constants';
 
 export class UI {
     constructor() {
@@ -15,7 +15,7 @@ export class UI {
 
     async ask_allow_read_perm(uri : vscode.Uri) {
         const items = this.make_allow_perm_items(uri);
-        const title = `'${constants.extname}' wants to read '${uri.path}'`;
+        const title = `'${CONSTANTS.extname}' wants to read '${uri.path}'`;
         const selection = await vscode.window.showQuickPick([...items.keys()], { placeHolder: title }) || "";
         let response = items.get(selection);
         return response;
@@ -23,7 +23,7 @@ export class UI {
 
     async ask_allow_write_perm(uri : vscode.Uri) {
         const items = this.make_allow_perm_items(uri);
-        const title = `'${constants.extname}' wants to write to '${uri.path}'`;
+        const title = `'${CONSTANTS.extname}' wants to write to '${uri.path}'`;
         const selection = await vscode.window.showQuickPick([...items.keys()], { placeHolder: title }) || "";
         let response = items.get(selection);
         return response;        

@@ -9,7 +9,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:**/.vscodegptconfig"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -18,16 +20,20 @@
         "title": "Suggest Goals"
       },
       {
-        "command": "stopAIassistantCommand",
-        "title": "Stop AI from background working on project"        
+        "command": "vscode-gpt.stopAIassistant",
+        "title": "Stop AI assistantt"
       },
       {
-        "command": "startAIassistantCommand",
-        "title": "Start AI from background working on project"        
+        "command": "vscode-gpt.startAIassistant",
+        "title": "Start AI assistantt"
       },
       {
-        "command": "pickModelCommand",
-        "title": "Pick model"        
+        "command": "vscode-gpt.pickModelCommand",
+        "title": "Pick model"
+      },
+      {
+        "command": "vscode-gpt.showWebView",
+        "title": "Show Webview"
       }
     ],
     "configuration": {
@@ -67,7 +73,7 @@
         "vscode-gpt.first_run": {
           "type": "boolean",
           "default": true,
-          "description": "Has the first-time initialization completed?"
+          "description": "Has, the first-time initialization completed?"
         }
       }
     }
@@ -91,12 +97,13 @@
     "directory-tree": "^3.5.1",
     "eslint": "^8.34.0",
     "glob": "^8.1.0",
-    "minimatch": "^7.4.3",
     "mocha": "^10.2.0",
     "openai": "^3.2.1",
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "openai": "^3.2.1"
+    "minimatch": "^5.1.2",
+    "openai": "^3.2.1",
+    "uuid": "^9.0.0"
   }
 }

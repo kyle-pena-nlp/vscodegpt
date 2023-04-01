@@ -1,4 +1,4 @@
-let constants = {
+export const CONSTANTS = {
     "extname": "vscode-gpt",
     "always_refuse_to_read_patterns": [
 
@@ -44,4 +44,3 @@ let constants = {
     ]
 }
 
-export = constants;
