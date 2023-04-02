@@ -88,6 +88,8 @@ Example: CLARIFY "create a python library"
 In this example, you have prompted the user for additional details on one of the user's goals.  You may issue this command when there is not enough information to write specific code to accomplish the user's stated goal.
 Resulting Action: The user will provide you with a clarified goal or more detail on their goal.
 
+In all following prompts, please respond only using the commands defined above, and nothing else.
+
 Please summarize the above commands in detail, step by step, so that a chatbot would understand how to issue these commands.
 `;
 

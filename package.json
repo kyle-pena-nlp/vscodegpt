@@ -16,24 +16,20 @@
   "contributes": {
     "commands": [
       {
-        "command": "vscode-gpt.suggestGoals",
-        "title": "Suggest Goals"
+        "command": "vscode-gpt.startAIassistant",
+        "title": "Start generating suggestions"
       },
       {
         "command": "vscode-gpt.stopAIassistant",
-        "title": "Stop AI assistantt"
+        "title": "Stop generating suggestions"
       },
       {
-        "command": "vscode-gpt.startAIassistant",
-        "title": "Start AI assistantt"
-      },
-      {
-        "command": "vscode-gpt.pickModelCommand",
+        "command": "vscode-gpt.pickModel",
         "title": "Pick model"
       },
       {
-        "command": "vscode-gpt.showWebView",
-        "title": "Show Webview"
+        "command": "vscode-gpt.showAICommandPanel",
+        "title": "Show AI Command Panel"
       }
     ],
     "configuration": {
@@ -44,6 +40,16 @@
           "type": "string",
           "default": "",
           "description": "Your API key for ChatGPT (See: https://platform.openai.com/account/api-keys)"
+        },
+        "vscode-gpt.AI_model": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "The OpenAI model to use as an assistant"
+        },
+        "vscode-gpt.auto_show_AI_command_panel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-show the command panel when the workspace is opened"
         },
         "vscode-gpt.AI_goals": {
           "type": "array",
@@ -94,6 +100,7 @@
     "@typescript-eslint/eslint-plugin": "^5.53.0",
     "@typescript-eslint/parser": "^5.53.0",
     "@vscode/test-electron": "^2.2.3",
+    "@vscode/webview-ui-toolkit": "^1.2.2",
     "directory-tree": "^3.5.1",
     "eslint": "^8.34.0",
     "glob": "^8.1.0",
@@ -102,8 +109,10 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
+    "@types/uuid": "^9.0.1",
+    "@vscode/webview-ui-toolkit": "^1.2.2",
     "minimatch": "^5.1.2",
     "openai": "^3.2.1",
-    "uuid": "^9.0.0"
+    "uuid": "^8.2.0"
   }
 }

@@ -25,8 +25,8 @@ const do_first_run = async () => {
     await write_empty_config_file();
 };
 
-export const maybe_do_first_run = async () => {
-    const configuration = new WorkspaceConfiguration();
+export const maybe_do_first_run = async (context : vscode.ExtensionContext) => {
+    const configuration = new WorkspaceConfiguration(context);
     if (await configuration.get_is_first_run()) {
         await do_first_run();
         configuration.set_is_first_run(false);

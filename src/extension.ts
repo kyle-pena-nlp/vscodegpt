@@ -1,99 +1,54 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { CONSTANTS } from './constants';
-import { AIAssistanceWorker } from './ai_assistance_worker';
-import { UI } from "./ui";
-import { BackgroundProcess } from "./background_process";
 import { AICommandPanel } from "./ai_command_panel";
+import { WorkspaceConfiguration } from './workspace_configuration';
 import { maybe_do_first_run } from './first_run';
+import { BackgroundProcess } from './background_process';
+import { AIAssistantWorker } from './ai_assistant_worker';
 
-function wait(ms: number) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        console.log("Done waiting");
-        resolve(ms)
-      }, ms )
-    })
-  };  
+// I give you fire.
+export async function activate(context: vscode.ExtensionContext) {
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+    const ai_command_panel = new AICommandPanel(context);
+    const workspace_configuration = new WorkspaceConfiguration(context);
+    const ai_assistant_worker = new AIAssistantWorker(ai_command_panel, context);
+    const ai_assistant_worker_background_process = new BackgroundProcess("ai_assistant_worker", 3000, async () => ai_assistant_worker.poll());
 
 
-	const apiKey = vscode.workspace.getConfiguration().get(`${CONSTANTS.extname}.apiKey`) as string;
-	const ai_assistance_worker = new AIAssistanceWorker(apiKey);
-  const ui = new UI();
-    
-  const poll_ai_assistant = async () => { console.log("hi!"); }; //async () => await ai_assistance_worker.poll();
-  const assistance_process = new BackgroundProcess("assistant_process", 3000, poll_ai_assistant);
-
-	let suggestGoalsCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.suggestGoals`, () => {
-		//TODO: ai_assistance_worker.suggest_goals();	
-	});
-
-    let stopAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.stopAIassistant`, () => {
-        assistance_process.stop();
-    });
-
-    let startAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.startAIassistant`, () => {
-        assistance_process.start();
+    let startAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.startAIassistant`, async () => {
+      ai_assistant_worker_background_process.start();
     });    
 
-    let doShowWebViewPanel = async () =>  {
+    let stopAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.stopAIassistant`, async () => {
+      await ai_assistant_worker_background_process.stop();
+    });        
 
-      console.log("rendering panel")
+    // Show the command panel
+    let showAICommandPanelCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.showAICommandPanel`, async () => {
+        await ai_command_panel.refresh();
+    });    
 
-      const panel = vscode.window.createWebviewPanel(
-        'actionApproval',
-        'Action Approval',
-        vscode.ViewColumn.One,
-        { enableScripts: true }
-      );
-  
-      const actions = [
-        { id: 1, description: 'Create a new file' },
-        { id: 2, description: 'Delete a file' },
-        { id: 3, description: 'Rename a file' },
-      ];
-  
-      panel.webview.html = showWebViewPanel(actions);
-  
-      panel.webview.onDidReceiveMessage(async (message) => {
-        switch (message.command) {
-          case 'approve':
-            console.log(`Action approved: ${message.id}`);
-            break;
-          case 'reject':
-            console.log(`Action rejected: ${message.id}`);
-            break;
-        }
-      });
-    };
-
-    let showWebViewCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.showWebView`, async () => {
-      console.log("Executing command");
-        await doShowWebViewPanel();
-      });    
-
+    // Let the user pcik the preferred model
     let pickModelCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.pickModel`, async () => {
-        const model = await ui.pick_model();
-        if (model) {
-            ai_assistance_worker.set_model(model);
-        }
+      const selectedModel = await vscode.window.showQuickPick(CONSTANTS.models, { placeHolder: `Pick your preferred AI model.  ${CONSTANTS.recommendedModel} recommended.` } as vscode.QuickPickOptions);
+      if (selectedModel) {
+        workspace_configuration.set_AI_model(selectedModel);
+      }
     }); 
 
-  context.subscriptions.push(showWebViewCommand);
-	context.subscriptions.push(suggestGoalsCommand);
-	context.subscriptions.push(stopAIassistantCommand);
-	context.subscriptions.push(startAIassistantCommand);
+  
+  context.subscriptions.push(startAIassistantCommand);
+  context.subscriptions.push(stopAIassistantCommand);
+  context.subscriptions.push(showAICommandPanelCommand);
 	context.subscriptions.push(pickModelCommand);
 
+  if (await workspace_configuration.get_auto_show_AI_command_panel()) {
+    vscode.commands.executeCommand(`${CONSTANTS.extname}.showAICommandPanel`);
+    vscode.commands.executeCommand(`${CONSTANTS.extname}.startAIassistant`);
+  }
 
-  vscode.commands.executeCommand(`${CONSTANTS.extname}.showWebView`);
 
-  maybe_do_first_run();
+  maybe_do_first_run(context);
 
 }
 

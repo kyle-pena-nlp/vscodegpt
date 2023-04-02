@@ -1,5 +1,7 @@
 
 import { OpenAIApi, Configuration, CreateChatCompletionRequest, ChatCompletionRequestMessage, ChatCompletionRequestMessageRoleEnum } from 'openai';
+import { WorkspaceConfiguration } from './workspace_configuration';
+import * as vscode from 'vscode';
 
 export interface ChatGPTResponse {
     success : boolean,
@@ -15,35 +17,31 @@ export interface ChatGPTResponse {
 
 export class ChatGPTClient{
 
-    private openAI: OpenAIApi;
-    private model: string;
+    private workspace_configuration : WorkspaceConfiguration;
 
-    constructor(apiKey : string, model : string) {
-		
-        const configuration = new Configuration({
-            apiKey: apiKey,
-        });
-        this.openAI = new OpenAIApi(configuration);
-        this.model = model;
-    }
-
-    set_model(model : string) {
-        this.model = model;
-    }
-
-    get_model() {
-        return this.model;
+    constructor(context : vscode.ExtensionContext) {
+        this.workspace_configuration = new WorkspaceConfiguration(context);		
     }
 
     async respond(chatGPTMessages: Array<ChatCompletionRequestMessage>) {
+
+
+        const configuration = new Configuration({
+            apiKey: await this.workspace_configuration.get_apiKey()
+        });
+
+        const openAI = new OpenAIApi(configuration);
+
+        const model = await this.workspace_configuration.get_AI_model();
+
         try {
 
             const request: CreateChatCompletionRequest = {
                 messages: chatGPTMessages,
-                model: this.model
+                model: model
             };
 
-            const response = await this.openAI.createChatCompletion(request);
+            const response = await openAI.createChatCompletion(request);
 
             if (!response.data || !response.data.choices) {
                 

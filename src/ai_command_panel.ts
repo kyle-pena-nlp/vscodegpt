@@ -1,45 +1,96 @@
 import * as vscode from 'vscode';
-import { AIAction } from "./ai_command";
+import { AIAction, AIGoal } from "./ai_command";
 import { AICommandDispatcher } from "./ai_command_dispatcher";
 import { WorkspaceConfiguration } from "./workspace_configuration";
+import { v4 as uuidv4 } from 'uuid';
 
 export class AICommandPanel {
 
   private workspace_configuration : WorkspaceConfiguration;
   private command_dispatcher : AICommandDispatcher;
+  private panel : vscode.WebviewPanel|null;
 
   constructor(context : vscode.ExtensionContext) {
     this.workspace_configuration = new WorkspaceConfiguration(context);
-    this.command_dispatcher = new AICommandDispatcher();
+    this.command_dispatcher = new AICommandDispatcher(context);
+    this.panel = null;
   }
 
-  panelUserAddsGoal = async (goal : string) => {
-    this.workspace_configuration.add_AI_goal(goal);
+
+  async refresh() {
+    const rendered_markup = await this.render_markup(await this.workspace_configuration.get_recommended_actions(), await this.workspace_configuration.get_AI_goals());
+    await this.ensure_panel();
+    this.panel!.webview.html = rendered_markup;
+  }    
+
+  private async panelUserAddsGoal(goalText : string) {
+    const id = uuidv4();
+    await this.workspace_configuration.add_AI_goal({
+      id: id,
+      description : goalText
+    } as AIGoal);
   }
 
-  panelUserRemovesGoal = async (goal : string) => {
-    this.workspace_configuration.remove_AI_goal(goal);
+  private async panelUserRemovesGoal(id : string) {
+    await this.workspace_configuration.remove_AI_goal(id);
   }
 
-  async panelUserApprovesAction(id : string) {
+  private async panelUserApprovesAction(id : string) {
     const action = await this.workspace_configuration.get_recommended_action_by_id(id);
     if (action == null) {
-      console.debug(`Couldn't find action with id ${id}`);
       return;
     }
-    const definitions = await this.workspace_configuration.get_command_execution_definitions();
-    const context = await this.workspace_configuration.get_command_execution_context();
-    const result = await this.command_dispatcher.dispatch_commands(action.commands, definitions, context);
-    if (result.success) {
-      await this.workspace_configuration.remove_recommended_action(id);
+    await this.command_dispatcher.dispatch_commands(action.commands);
+    await this.workspace_configuration.remove_recommended_action(id);
+  }
+
+  private async panelUserRejectsAction(id : string) {
+    await this.workspace_configuration.remove_recommended_action(id);
+  }
+
+
+  private async ensure_panel() {
+    if (!this.panel) {
+      await this.make_panel();
     }
   }
 
-  async refresh_panel() {
-    this.show(await this.workspace_configuration.get_recommended_actions(), await this.workspace_configuration.get_AI_goals());
+  private async make_panel() {
+    this.panel = vscode.window.createWebviewPanel(
+      'aiCommandPanel',
+      'AI Command Panel',
+      vscode.ViewColumn.One,
+      { enableScripts: true }
+    );
+
+    this.panel.webview.onDidReceiveMessage(this.handlePanelMessage.bind(this));
   }
 
-  show = async (actions: Array<AIAction>, goals : Array<string>) => {
+
+  private async handlePanelMessage(message : any) {
+    switch (message.command) {
+      case 'approveAction':
+        console.log(`Action approved: ${message.id}`);
+        await this.panelUserApprovesAction(message.id);
+        await this.refresh();
+        break;
+      case 'rejectAction':
+        console.log(`Action rejected: ${message.id}`);
+        await this.panelUserRejectsAction(message.id);
+        await this.refresh();
+        break;
+      case 'addGoal':
+        await this.panelUserAddsGoal(message.goal);
+        await this.refresh();
+        break;
+      case 'removeGoal':
+        await this.panelUserRemovesGoal(message.id);
+        await this.refresh();
+        break;
+    }
+  }
+
+  private async render_markup(actions: Array<AIAction>, goals : Array<AIGoal>) {
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -77,8 +128,8 @@ export class AICommandPanel {
             ${actions.map(action => `
               <li>
                 ${action.description}
-                <button onclick="approveAction(${action.id})">Approve</button>
-                <button onclick="rejectAction(${action.id})">Reject</button>
+                <button onclick="approveAction('${action.id}')">Approve</button>
+                <button onclick="rejectAction('${action.id}')">Reject</button>
               </li>
             `).join('')}
           </ul>
@@ -88,8 +139,8 @@ export class AICommandPanel {
           <ul id="goals">
             ${goals.map(goal => `
               <li>
-                ${goal}
-                <button onclick="removeGoal(${goal})">Reject</button>
+                ${goal.description}
+                <button onclick="removeGoal('${goal.id}')">Remove</button>
               </li>
             `).join('')}
           </ul>
@@ -110,30 +161,18 @@ export class AICommandPanel {
           function addGoal() {
             const newGoalInput = document.getElementById('newGoal');
             const goalText = newGoalInput.value.trim();
-
             if (goalText.length === 0) {
               return;
             }
-
-            const goalsList = document.getElementById('goals');
-            const goalItem = document.createElement('li');
-            goalItem.innerText = goalText;
-            goalItem.innerHTML += ' <button onclick="removeGoal(this)">Remove</button>';
-            goalsList.appendChild(goalItem);
-
-            newGoalInput.value = '';
+            vscode.postMessage({ command: 'addGoal', goal: goalText });     
           }
 
-          function removeGoal(button) {
-            const goalItem = button.parentElement;
-            vscode.postMessage({ command: 'removeGoal', id });            
-            goalItem.remove();
+          function removeGoal(id) {
+            vscode.postMessage({ command: 'removeGoal', id: id });            
           }
         </script>
       </body>
     </html>
   `;
   }
-
-
 }

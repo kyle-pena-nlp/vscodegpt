@@ -8,8 +8,8 @@ export class Permissions {
     private workspace_configuration : WorkspaceConfiguration;
     private ui : UI;
 
-    constructor() {
-        this.workspace_configuration = new WorkspaceConfiguration();
+    constructor(context: vscode.ExtensionContext) {
+        this.workspace_configuration = new WorkspaceConfiguration(context);
         this.ui = new UI();
     }
 

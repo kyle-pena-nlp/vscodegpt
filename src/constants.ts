@@ -41,6 +41,11 @@ export const CONSTANTS = {
         "**/*.ico", 
         "**/*.3dm",
         "**/*.max",
-    ]
+    ],
+    "models": [
+        "gpt-3.5-turbo",
+        "text-davinci-003"
+    ],
+    "recommendedModel": "gpt-3.5-turbo"
 }
 

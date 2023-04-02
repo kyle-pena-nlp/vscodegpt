@@ -1,4 +1,5 @@
-import { AICommand } from "./ai_command";
+import { AIAction, AICommand } from "./ai_command";
+import { v4 as uuidv4 } from 'uuid';
 
 export class AICommandParser {
 
@@ -18,12 +19,15 @@ export class AICommandParser {
     }
 
     parse_action(prompt_response : string) {
+        
         const commands = this.parse_commands(prompt_response);
         const commands_description = JSON.stringify(commands);
+        const id = uuidv4();
         return {
+            id: id,
             description : commands_description,
             commands: commands
-        }
+        } as AIAction;
     }
 
     parse_commands(prompt_response : string) {

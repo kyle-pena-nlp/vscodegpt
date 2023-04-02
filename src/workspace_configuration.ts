@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { CONSTANTS } from './constants';
-import { v4 as uuidv4 } from 'uuid';
-import { AIAction, AICommand } from './ai_command';
+import { AIAction, AIGoal, HasID } from './ai_command';
 
 export class WorkspaceConfiguration {
 
@@ -44,15 +43,15 @@ export class WorkspaceConfiguration {
     }
 
     async get_AI_goals() {
-        return this.get_config_property<Array<string>>("AI_goals", []);
+        return this.get_workspace_property<Array<AIGoal>>("AI_goals", []);
     }
 
-    async add_AI_goal(goal : string) {
-        await this.append_to_config_property("AI_goals", goal);
+    async add_AI_goal(goal : AIGoal) {
+        await this.append_to_workspace_property("AI_goals", goal);
     }
 
-    async remove_AI_goal(goal : string) {
-        await this.remove_item_from_arr_config_property("AI_goals", goal);
+    async remove_AI_goal(id : string) {
+        await this.remove_from_workspace_property_by_id("AI_goals", id);
     }
 
     async get_is_first_run() {
@@ -63,39 +62,45 @@ export class WorkspaceConfiguration {
         await this.set_config_property("first_run", value);
     }
 
-    async get_recommended_actions() {
-        return this.context.workspaceState.get<Array<AIAction>>('recommendedActions') || [];
+    async get_auto_show_AI_command_panel() {
+        return await this.get_config_property<boolean>("auto_show_AI_command_panel", true);
     }
 
-    async add_recommended_action(commands : Array<AICommand>) {
-        const new_id = uuidv4();
-        const action = {
-            id : new_id,
-            commands : commands
-        } as AIAction;
-        const recommendedActions = this.context.workspaceState.get<Array<AIAction>>('recommendedActions') || [];
-        recommendedActions.push(action);
-        this.context.workspaceState.update('recommendedActions', recommendedActions);
+    async set_auto_show_AI_command_panel(value : boolean) {
+        await this.set_config_property("auto_show_AI_command_panel", value);
+    }
+
+    async set_AI_model(value : string) {
+        return await this.set_config_property("AI_model", value);
+    }
+
+    async get_AI_model() {
+        return await this.get_config_property<string>("AI_model", "");
+    }
+
+    async get_apiKey() {
+        return vscode.workspace.getConfiguration().get(`${CONSTANTS.extname}.apiKey`) as string;
+    }
+
+    async set_apiKey(apiKey : string) {
+        vscode.workspace.getConfiguration().set(`${CONSTANTS.extname}.apiKey`, apiKey);
+    }
+
+
+    async get_recommended_actions() {
+        return this.get_workspace_property<Array<AIAction>>('recommendedActions', [])
+    }
+
+    async add_recommended_action(action: AIAction) {
+        await this.append_to_workspace_property('recommendedActions', action)
     }
 
     async remove_recommended_action(id : string) {
-        const recommendedActions = this.context.workspaceState.get<Array<AIAction>>('recommendedActions') || [];
-        const filteredActions = recommendedActions.filter(action => action.id !== id);
-        this.context.workspaceState.update('recommendedActions', filteredActions);        
+        await this.remove_from_workspace_property_by_id<AIAction>('recommendedActions', id);
     }
 
     async get_recommended_action_by_id(id : string) {
-        const recommendedActions = this.context.workspaceState.get<Array<AIAction>>('recommendedActions') || [];
-        const filteredActions = recommendedActions.filter(action => action.id === id);
-        if (filteredActions.length === 1) {
-            return filteredActions[0];
-        }
-        else if (filteredActions.length === 0) {
-            return null;
-        }
-        else {
-            throw `More than one action with id ${id}`;
-        }
+        return await this.get_from_workspace_by_id<AIAction>('recommendedActions', id);
     }
 
     async get_command_execution_definitions() {
@@ -124,5 +129,51 @@ export class WorkspaceConfiguration {
 
     private get_config_property<T>(property : string, default_value : T ) {
         return vscode.workspace.getConfiguration(`${CONSTANTS.extname}`).get<T>(property, default_value);
+    }    
+
+
+    async get_workspace_property<T>(property : string, defaultValue? : T) {
+        return this.context.workspaceState.get<T>(property, defaultValue!);
+    }
+
+    async set_workspace_property<T>(property : string, value : T) {
+        this.context.workspaceState.update(property, value);
+    }
+
+    async append_to_workspace_property<T>(property : string, value : T) {
+        const values = await this.get_workspace_property<Array<T>>(property) || [];
+        values.push(value);
+        await this.set_workspace_property<Array<T>>(property, values);
+    }
+
+    async remove_from_workspace_property<T>(property : string, value : T) {
+        const values = await this.get_workspace_property<Array<T>>(property) || [];
+        const new_values = values.filter(item => item !== value);
+        await this.set_workspace_property(property, new_values);
+    }
+
+    async remove_from_workspace_property_by_id<T extends HasID>(property : string, id : string) {
+        const values = await this.get_workspace_property<Array<T>>(property) || [];
+        const new_values = values.filter(item => item.id !== id);
+        await this.set_workspace_property(property, new_values);        
+    }
+
+    async get_from_workspace_by_id<T extends HasID>(property : string, id : string, defaultValue? : T) {
+        const values = await this.get_workspace_property<Array<T>>(property) || [];
+        const new_values = values.filter(item => item.id === id);
+        if (new_values.length == 0) {
+            if (defaultValue !== undefined) {
+                return defaultValue;
+            }
+            else {
+                return null;
+            }
+        }           
+        else if (new_values.length == 1) {
+            return new_values[0];
+        }
+        else {
+            throw `More than one ${property} from workspace with id ${id}`;
+        }
     }    
 }

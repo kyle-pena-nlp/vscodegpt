@@ -3,6 +3,7 @@ import { Workspace } from "./workspace";
 import { UI } from "./ui";
 import { Permissions } from "./permissions";
 import { AICommand, AICommandExecutionResult } from './ai_command';
+import { WorkspaceConfiguration } from './workspace_configuration';
 
 /*
     1. DEFINEFILECONTENTS
@@ -19,16 +20,24 @@ import { AICommand, AICommandExecutionResult } from './ai_command';
 export class AICommandDispatcher {
 
     private workspace : Workspace;
+    private workspace_configuration : WorkspaceConfiguration;
     private ui: UI;
     private permissions: Permissions;
 
-    constructor() {
+    constructor(context : vscode.ExtensionContext) {
         this.workspace = new Workspace();
+        this.workspace_configuration = new WorkspaceConfiguration(context);
         this.ui = new UI();
-        this.permissions = new Permissions();
+        this.permissions = new Permissions(context);
     }
 
-    async dispatch_commands(commands : Array<AICommand>, definitions : Map<string,string>, context : Map<string,string>) {
+    async dispatch_commands(commands : Array<AICommand>) {
+        const definitions = await this.workspace_configuration.get_command_execution_definitions();
+        const context = await this.workspace_configuration.get_command_execution_context();
+        return await this.dispatch_commands_internal(commands, definitions, context);
+    }
+
+    private async dispatch_commands_internal(commands : Array<AICommand>, definitions : Map<string,string>, context : Map<string,string>) {
         try{
             for (const command of commands) {
                 await this.gather_definitions(command, definitions, context);
@@ -59,10 +68,9 @@ export class AICommandDispatcher {
                 context: context
             } as AICommandExecutionResult;
         }
-
     }
 
-    async gather_definitions(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+    private async gather_definitions(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
         const verb = command.verb;
         if (verb == "DEFINEFILECONTENTS") {
             const arg1 = command.arg1!;
@@ -71,7 +79,7 @@ export class AICommandDispatcher {
         }
     }
 
-    async gather_context_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+    private async gather_context_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
         const verb = command.verb;    
         if (verb == "READDIR") {
             const workspace_root = vscode.Uri.parse("./", false);
@@ -96,7 +104,7 @@ export class AICommandDispatcher {
         }
     }
 
-    async execute_ui_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+    private async execute_ui_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
         const verb = command.verb;
         if (verb == "CLARIFY") {
             const arg1 = command.arg1!;
@@ -107,7 +115,7 @@ export class AICommandDispatcher {
         }
     }
 
-    async execute_workspace_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
+    private async execute_workspace_command(command : AICommand, definitions : Map<string,string>, context : Map<string,string>) {
         const verb = command.verb;
         if (verb == "MOVEFILE") {
             const arg1 = command.arg1!;
