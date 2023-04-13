@@ -1,8 +1,40 @@
 import * as vscode from 'vscode';
-import { AIAction, AIGoal } from "./ai_command";
+import { AIAction, AIClarification, AIContextItem, AIDefinition, AIGoal, AINotification, AISummarization } from "./ai_com_types";
 import { AICommandDispatcher } from "./ai_command_dispatcher";
 import { WorkspaceConfiguration } from "./workspace_configuration";
 import { v4 as uuidv4 } from 'uuid';
+
+export class AIPanelState {
+  private actions : Array<AIAction>;
+  private goals : Array<AIGoal>;
+  private clarifications : Array<AIClarification>;
+  private notifications : Array<AINotification>;
+  private contextItems : Array<AIContextItem>;
+  private definitions : Array<AIDefinition>;
+  private summarizations : Array<AISummarization>;
+
+
+  constructor(actions : Array<AIAction>, goals : Array<AIGoal>, clarifications : Array<AIClarification>, notifications : Array<AINotification>, contextItems : Array<AIContextItem>, definitions : Array<AIDefinition>, summarizations : Array<AISummarization>) {
+    this.actions = actions;
+    this.goals = goals;
+    this.clarifications = clarifications;
+    this.notifications = notifications;
+    this.contextItems = contextItems;
+    this.definitions = definitions;
+    this.summarizations = summarizations;
+  }
+
+  get_chat_items() : Array<AIChatItem> {
+    return [
+      ...this.actions,
+      ...this.summarizations, 
+    ]
+  }
+
+  get_info_items() : Array<AIInfoItem> {
+    return []
+  }
+}
 
 export class AICommandPanel {
 
@@ -83,9 +115,25 @@ export class AICommandPanel {
         await this.panelUserAddsGoal(message.goal);
         await this.refresh();
         break;
+      case 'editGoal':
+        // TODO:
+        this.refresh();
+        break;
       case 'removeGoal':
         await this.panelUserRemovesGoal(message.id);
         await this.refresh();
+        break;
+      case 'addClarification':
+        // TODO
+        this.refresh();
+        break;
+      case 'editClarification':
+        // TODO
+        this.refresh();
+        break;
+      case 'removeClarification':
+        // TODO
+        this.refresh();
         break;
     }
   }
@@ -122,32 +170,19 @@ export class AICommandPanel {
         </style>
       </head>
       <body>
-        <div class="left-panel">
-          <h1>Action Approval</h1>
-          <ul>
-            ${actions.map(action => `
-              <li>
-                ${action.description}
-                <button onclick="approveAction('${action.id}')">Approve</button>
-                <button onclick="rejectAction('${action.id}')">Reject</button>
-              </li>
-            `).join('')}
-          </ul>
+
+        <div id="fakeChatWindow" class="left-panel">
+          {chatItemsMarkup}
         </div>
-        <div class="right-panel">
-          <h1>Goals</h1>
-          <ul id="goals">
-            ${goals.map(goal => `
-              <li>
-                ${goal.description}
-                <button onclick="removeGoal('${goal.id}')">Remove</button>
-              </li>
-            `).join('')}
-          </ul>
-          <input type="text" id="newGoal" placeholder="Type a new goal">
-          <button onclick="addGoal()">Add Goal</button>
+
+        <div id="infoSidePanel" class="right-panel">
+          {infoItemsMarkup}
         </div>
+        
         <script>
+
+          const ENTER_KEY = 13;
+
           const vscode = acquireVsCodeApi();
 
           function approveAction(id) {
@@ -158,12 +193,15 @@ export class AICommandPanel {
             vscode.postMessage({ command: 'rejectAction', id });
           }
 
-          function addGoal() {
-            const newGoalInput = document.getElementById('newGoal');
-            const goalText = newGoalInput.value.trim();
-            if (goalText.length === 0) {
+          function goalInputKeyPress(event) {
+            if (event.keyCode != ENTER_KEY) {
               return;
             }
+            const goalText = event.target.value.trim();
+            addGoal(goalText);
+          }
+
+          function addGoal(goalText) {
             vscode.postMessage({ command: 'addGoal', goal: goalText });     
           }
 

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { Workspace } from "./workspace";
 import { UI } from "./ui";
 import { Permissions } from "./permissions";
-import { AICommand, AICommandExecutionResult } from './ai_command';
+import { AICommand, AICommandExecutionResult } from './ai_com_types';
 import { WorkspaceConfiguration } from './workspace_configuration';
 
 /*

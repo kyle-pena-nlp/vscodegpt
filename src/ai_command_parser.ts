@@ -1,21 +1,13 @@
-import { AIAction, AICommand } from "./ai_command";
+import { parse } from "path";
+import { AIAction, AICommand } from "./ai_com_types";
 import { v4 as uuidv4 } from 'uuid';
 
 export class AICommandParser {
 
-    private known_commands : Array<string>;
+    private command_grammars : Array<Array<string>>;
 
-    constructor() {
-        this.known_commands = [
-            "DEFINEFILECONTENTS",
-            "ENDDEFINEFILECONTENTS",
-            "MOVEFILE",
-            "CREATEFILE",
-            "CREATEDIR",
-            "READFILE",
-            "READDIR",
-            "CLARIFY"
-        ]
+    constructor(command_grammars : Array<Array<string>>) {
+        this.command_grammars = command_grammars;
     }
 
     parse_action(prompt_response : string) {
@@ -31,8 +23,8 @@ export class AICommandParser {
     }
 
     parse_commands(prompt_response : string) {
-        const raw_parsed_commands = this.parse_commands_internal(prompt_response);
-        return raw_parsed_commands.map(command_arr => this.arr_to_AI_command_obj(command_arr));
+        const raw_command_arrs = this.try_parse_commands(prompt_response);
+        return raw_command_arrs.map(command_arr => this.arr_to_AI_command_obj(command_arr));
     }
     
     arr_to_AI_command_obj(command_arr : Array<string>) {
@@ -43,74 +35,123 @@ export class AICommandParser {
         } as AICommand;
     }
 
-    parse_commands_internal(prompt_response : string) {
+    private try_parse_commands(multiline_input : string) : string[][] {
+        const command_arrs : string[][] = [];
+        let input_copy = multiline_input.slice(0);
+        while(true) {
 
-        console.log(prompt_response);
-
-        const lines = prompt_response.split(/\r\n|\r|\n/);
-        
-        let state = "PARSING";
-        let current_definition = [];
-        let define_key = undefined;
-        const parsed_commands = [];
-        const definitions = new Map<string,string>();
-
-        for (const line of lines) {
-            console.log(`parsing line: ${line}`)
-            if (state == "PARSING") {
-                if (this.looks_like_command(line)) {
-                    console.log("Looks like command");
-                    const command_tokens = this.parse_command(line);
-                    if (!command_tokens) {
-                        console.log("But has no command tokens");
-                        continue;
-                    }
-                    parsed_commands.push(command_tokens);
-                    if (command_tokens[0] === "DEFINEFILECONTENTS") {
-                        console.log("Starting to define file contents")
-                        const maybe_define_key = command_tokens[1];
-                        if (maybe_define_key) {
-                            state = "DEFINING";
-                            define_key = maybe_define_key;
-                            console.log("Entered defining state")
-                        }
-                        else {
-                            console.log("But there was no define key")
-                        }
-                    }                    
-                }
+            // termination condition: no input left to parse.
+            input_copy = input_copy.trim();
+            if (input_copy.length === 0) {
+                break;
             }
-            else if (state == "DEFINING") {
-                console.log("   in defining state")
-                if (this.looks_like_command(line)) {
-                    const command_tokens = this.parse_command(line);
-                    if (!command_tokens) {
-                        continue;
-                    }
-                    const command_verb = command_tokens[0];
-                    if (command_verb == "ENDDEFINEFILECONTENTS") {
-                        console.log("   breaking out of defining state")
-                        if (define_key) {
-                            state = "PARSING";
-                            const complete_definition = current_definition.join("\n");
-                            definitions.set(define_key, complete_definition);
-                            console.log("   Back into parsing state!")
-                            continue;
-                        }
-                        else {
-                            console.log("   but couldn't because there wasn't a define_key")
-                        }
-                    }
-                }
-                current_definition.push(line);
+
+            // if what remains is a command, parse it and continue
+            const [success, command_arr, reduced_input] = this.try_parse_next_command(input_copy);
+            if (success) {
+                command_arrs.push(command_arr!);
+                input_copy = reduced_input!;
+            }
+            // otherwise consume a line and continue
+            else {
+                input_copy = this.consume_line(input_copy);
             }
         }
-
-        console.log("parsed commands: " );
-        console.log(JSON.stringify(parsed_commands));
-
-        return parsed_commands;
+        return command_arrs;
     }
+
+    private consume_line(input_copy : string) {
+        const pat = /^[^\r\n]*[\r\n]?/g
+        return input_copy.replace(pat,"");
+    }
+
+    try_parse_next_command(multiline_input : string) : [boolean,string[]|null,string|null] {
+        for (const grammar of this.command_grammars) {
+            const [success,contents,reduced_input] = this.try_parse_start_of_string_with_grammar(multiline_input, grammar);
+            if (success) {
+                return [true,contents!,reduced_input];
+            }
+        }
+        return [false,null,null];
+    }
+
+    private try_parse_start_of_string_with_grammar(input : string, grammar : string[]) : [boolean,string[]|null,string|null] {
+        
+        let grammar_copy = grammar.slice(0);
+        let input_copy = input.slice(0);
+        let parse_success = true;
+        const contents : string[] = [];
+
+        while (grammar_copy.length > 0) {
+            const [smaller_input,content,success] = this.consume_grammar_token(grammar_copy[0], input_copy);
+            if (!success) {
+                parse_success = false;
+                break;
+            }
+            input_copy = smaller_input;
+            grammar_copy = grammar_copy.slice(1);
+            contents.push(content!);
+        }
+
+        if (!parse_success) {
+            return [false,null,null];
+        }
+
+        return [true,contents,input_copy];
+    }
+
+    private consume_grammar_token(token : string, input : string) : [string,string|null,boolean] {
+
+        // Consume a quoted string (or just a word, if there are no quotes)
+        if (token === "<quoted-string>") {
+            const pattern = /^\s*(["'][^"']*["']|\b\w+\b)/;
+            const match = input.match(pattern);
+            if (match) {
+                const content = match[1];
+                const reduced_input = input.replace(pattern, "");
+                return [reduced_input,content,true];
+            }
+            else {
+                return [input,null,false];
+            }
+        }
+        // Consume the rest of the response ("until end of file")
+        else if (token == "<until-EOF>") {
+            return ["", input, true];
+        }
+        // Consume the rest of the line ("until end of line")
+        else if (token == "<until-EOL>") {
+            const pattern = /^.*$/m;
+            const match = input.match(pattern);
+            const content = match?.[0] || "";
+            const reduced_input = input.replace(pattern, "");
+            return [reduced_input,content,true];          
+        }
+        // Consume the rest of the response until the token listed after "<until-" and before ">" is encountered as the first token on a new line. Else, consume rest of response.
+        else if (token.startsWith("<until-")) {
+            // TODO: error condition. <until- is malformed.
+            const sentinel_token = token.match(/<until-([^>]+)>/)?.[1];
+            const pattern = RegExp(`^((?!\\s*${sentinel_token})[^\\r\\n]*[\\r\\n]*)+`, "m"); // i.e.; /^((?!\s*ENDDEFINEFILECONTENT)[^\r\n]*[\r\n]*)+/m
+            const match = input.match(pattern);
+            const content = match?.[0] || "";
+            const reduced_input = input.replace(pattern, "");
+            return [reduced_input,content,true];
+        }
+        // Match a literal token.
+        else {
+            // TODO: error condition when the token interpolated into the command has single or double quotes
+            const pattern = RegExp(`^\\s*((["']${token}["'])|(\\b${token}\\b))`);
+            const match = input.match(pattern);
+            if (match) {
+                const content = match[1];
+                const reduced_input = input.replace(pattern, "");
+                return [reduced_input,content,true];
+            }
+            else {
+                return [input,null,false];
+            }
+        }
+     }
 
     looks_like_command(line : string) {
         const cleaned_line = this.clean_up_command_line_junk(line);

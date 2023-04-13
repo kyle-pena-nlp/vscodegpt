@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { CONSTANTS } from './constants';
-import { AIAction, AIGoal, HasID } from './ai_command';
+import { AIAction, AIGoal, HasID } from './ai_com_types';
 
 export class WorkspaceConfiguration {
 
