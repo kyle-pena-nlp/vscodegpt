@@ -1,14 +1,15 @@
 import * as vscode from 'vscode';
 const path = require('path');
+const fs = require('fs');
+const textExtensions = require('text-extensions');
 
 export class Workspace {
 
     constructor() {
     }
 
-    async read_fs_tree() {
+    async read_fs_tree(uri : vscode.Uri) {
         let tree = {}
-        const uri = vscode.Uri.file("./")
         await this.make_fs_tree_recursively(uri, tree);
         return tree;
     }
@@ -26,8 +27,76 @@ export class Workspace {
         }
     }
 
+
+    makeUriRelativeToWorkspaceRoot(uri : vscode.Uri) : string  {
+        this.validateIsWithinWorkspace(uri);        
+        return vscode.workspace.asRelativePath(uri.fsPath, true);
+    }
+
+    getWorkspaceRootUri() {
+        return vscode.workspace.workspaceFolders![0].uri;
+    }
+
+    private isWithin(uri : vscode.Uri, parentUri : vscode.Uri) {
+        const relativePath = path.relative(parentUri.fsPath, uri.fsPath);
+        const isWithin = !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+        return isWithin;
+    }    
+
+    validateIsWithinWorkspace(uri : vscode.Uri) {
+        const withinWorkspace = this.isWithin(uri, this.getWorkspaceRootUri());
+        if (!withinWorkspace) {
+            throw `Not within workspace: ${uri.fsPath}`;
+        }
+    }
+
+
+    async isTextFile(uri : vscode.Uri) : Promise<boolean|null> {
+        const filestream = this.openFileStream(uri);
+        const detectedType = await (await import('file-type')).fileTypeFromStream(filestream);
+        if (detectedType) {
+          return textExtensions.includes(detectedType.ext);
+        } else {
+          return null;
+        }
+    }
+
+    async isDirectory(uri : vscode.Uri) : Promise<boolean> {
+        if (uri.scheme !== "file") {
+            return false;
+        }
+        const stat = fs.stat(uri.fsPath);
+        return stat.isFile();
+    }
+
+    async readFile(uri : vscode.Uri) {
+        const fsPath = uri.fsPath;
+        const fileBuffer = (await fs.promises.readFile(fsPath)) as string;
+        return fileBuffer;
+    }   
+
+    openFileStream(uri : vscode.Uri) {
+        // TODO: detect and handle non-utf8
+        const readableStream = fs.createReadStream(uri.fsPath, 'utf8');
+        return readableStream;        
+    }
+    
+
+    async isFile(uri : vscode.Uri) {
+        if (uri.scheme !== "file") {
+            return false;
+        }
+        try {
+            const stats = await fs.stat(uri.fsPath);
+            return stats.isFile();
+        } catch (err) {
+            console.error('Error:', err);
+            return false;
+        }
+    }
+
     async command_readdir(uri : vscode.Uri) {
-        return this.read_fs_tree()
+        return this.read_fs_tree(uri);
     }
 
     async command_readfile(uri : vscode.Uri) {

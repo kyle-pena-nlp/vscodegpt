@@ -104,7 +104,7 @@ export class AICommandParser {
 
         // Consume a quoted string (or just a word, if there are no quotes)
         if (token === "<quoted-string>") {
-            const pattern = /^\s*(["'][^"']*["']|\b\w+\b)/;
+            const pattern = /^\s*["']([^"']*)["']|\b\w+\b/;
             const match = input.match(pattern);
             if (match) {
                 const content = match[1];
@@ -131,7 +131,7 @@ export class AICommandParser {
         else if (token.startsWith("<until-")) {
             // TODO: error condition. <until- is malformed.
             const sentinel_token = token.match(/<until-([^>]+)>/)?.[1];
-            const pattern = RegExp(`^((?!\\s*${sentinel_token})[^\\r\\n]*[\\r\\n]*)+`, "m"); // i.e.; /^((?!\s*ENDDEFINEFILECONTENT)[^\r\n]*[\r\n]*)+/m
+            const pattern = RegExp(`^((?!\\s*${sentinel_token}\\s*$)[^\\r\\n]*[\\r\\n]*)+`, "m"); // i.e.; /^((?!\s*ENDDEFINEFILECONTENT)[^\r\n]*[\r\n]*)+/m
             const match = input.match(pattern);
             const content = match?.[0] || "";
             const reduced_input = input.replace(pattern, "");
@@ -153,72 +153,7 @@ export class AICommandParser {
         }
      }
 
-    looks_like_command(line : string) {
-        const cleaned_line = this.clean_up_command_line_junk(line);
-        const startsWithCommand = (this.known_commands.map(known_command => cleaned_line.startsWith(known_command)).includes(true));
-        return startsWithCommand;
-    }
-
     clean_up_command_line_junk(line : string) {
         return line.replace(/^[-*\d.]+\s*/, "").trim();
-    }
-
-    parse_command(line : string) {
-        const cleaned_line = this.clean_up_command_line_junk(line);
-        const tokens = cleaned_line.trim().match(/"([^"]*)"|'([^']*)'|`([^`]+)`|\S+/g)?.map(match => match.toString()) || [];
-        if (tokens.length == 0) {
-            return undefined;
-        }
-        const verb = this.clean_up_verb(tokens[0]);
-        if (verb == "DEFINEFILECONTENTS") {
-            if (tokens[1]) {
-                return [verb, this.remove_quoting(tokens[1])];
-            }
-        }
-        else if (verb == "ENDDEFINEFILECONTENTS") {
-            return [verb];
-        }
-        else if (verb == "MOVEFILE") {
-            if (tokens[1] && tokens[2]) {
-                return [verb, this.remove_quoting(tokens[1]), this.remove_quoting(tokens[2])];
-            }
-        }
-        else if (verb == "CREATEFILE") {
-            if (tokens[1] && tokens[2]) {
-                return [verb, this.remove_quoting(tokens[1]), this.remove_quoting(tokens[2])];
-            }
-        }
-        else if (verb == "CREATEDIR") {
-            if (tokens[1]) {
-                return [verb, this.remove_quoting(tokens[1])];
-            }
-        }
-        else if (verb == "READFILE") {
-            if (tokens[1]) {
-                return [verb, this.remove_quoting(tokens[1])];
-            }
-        }
-        else if (verb == "READDIR") {
-            if (tokens[1]) {
-                return [verb, this.remove_quoting(tokens[1])];
-            }
-        }
-        else if (verb == "CLARIFY") {
-            if (tokens[1]) {
-                return [verb, this.remove_quoting(tokens.slice(1).join(" "))];
-            }
-        }
-        else if (verb == "ENDDEFINEFILECONTENTS") {
-            return [verb];
-        }
-        return tokens;
-    }
-
-    clean_up_verb(verb : string) {
-        return verb.replace(/^[:'"]|[:'"]$/g, '');
-    }
-
-    remove_quoting(verb : string) {
-        return verb.replace(/^['"]|['"]$/g, '');
     }
 }

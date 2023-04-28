@@ -4,7 +4,7 @@
   "description": "A project-aware, goal-based way to write code with ChatGPT",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.76.0"
+    "vscode": "^1.77.0"
   },
   "categories": [
     "Other"
@@ -28,10 +28,102 @@
         "title": "Pick model"
       },
       {
-        "command": "vscode-gpt.showAICommandPanel",
-        "title": "Show AI Command Panel"
+        "command": "vscode-gpt.giveFolderCommand",
+        "title": "Give AI Command"
+      },
+      {
+        "command": "vscode-gpt.addFolderAdvice",
+        "title": "Give AI Advice"
+      },
+      {
+        "command": "vscode-gpt.refreshFolderSummary",
+        "title": "Tell AI To Read This"
+      },
+      {
+        "command": "vscode-gpt.giveFileCommand",
+        "title": "Give AI Command"
+      },
+      {
+        "command": "vscode-gpt.addFileAdvice",
+        "title": "Give AI Advice"
+      },
+      {
+        "command": "vscode-gpt.refreshFileSummary",
+        "title": "Tell AI To Read This"
+      },
+      {
+        "command": "vscode-gpt.giveEditorCommand",
+        "title": "Give AI Command"
+      },
+      {
+        "command": "vscode-gpt.addEditorAdvice",
+        "title": "Give AI Advice"
+      },
+      {
+        "command": "vscode-gpt.refreshEditorSummary",
+        "title": "Tell AI To Read This"
+      },
+      {
+        "command": "vscode-gpt.giveSelectionCommand",
+        "title": "Tell AI To Rewrite"
       }
     ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "vscode-gpt.giveFolderCommand",
+          "group": "navigation@1"
+        },
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "vscode-gpt.addFolderAdvice",
+          "group": "navigation@2"
+        },
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "vscode-gpt.refreshFolderSummary",
+          "group": "navigation@3"
+        },
+        {
+          "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
+          "command": "vscode-gpt.giveFileCommand",
+          "group": "navigation@1"
+        },
+        {
+          "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
+          "command": "vscode-gpt.addFileAdvice",
+          "group": "navigation@2"
+        },
+        {
+          "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
+          "command": "vscode-gpt.refreshFileSummary",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "when": "resourceScheme == 'file' && !editorHasSelection",
+          "command": "vscode-gpt.giveEditorCommand",
+          "group": "navigation@1"
+        },
+        {
+          "when": "resourceScheme == 'file' && !editorHasSelection",
+          "command": "vscode-gpt.addEditorAdvice",
+          "group": "navigation@2"
+        },
+        {
+          "when": "resourceScheme == 'file' && !editorHasSelection",
+          "command": "vscode-gpt.refreshEditorSummary",
+          "group": "navigation@3"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "vscode-gpt.giveSelectionCommand",
+          "group": "navigation@1"
+        }
+      ]
+    },
     "configuration": {
       "type": "object",
       "title": "vscode-gpt",
@@ -95,14 +187,14 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
-    "@types/vscode": "^1.76.0",
-    "@typescript-eslint/eslint-plugin": "^5.53.0",
-    "@typescript-eslint/parser": "^5.53.0",
+    "@types/node": "^16.18.25",
+    "@types/vscode": "^1.77.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.1",
+    "@typescript-eslint/parser": "^5.59.1",
     "@vscode/test-electron": "^2.2.3",
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "directory-tree": "^3.5.1",
-    "eslint": "^8.34.0",
+    "eslint": "^8.39.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
     "openai": "^3.2.1",
@@ -111,8 +203,10 @@
   "dependencies": {
     "@types/uuid": "^9.0.1",
     "@vscode/webview-ui-toolkit": "^1.2.2",
+    "file-type": "^18.3.0",
     "minimatch": "^5.1.2",
     "openai": "^3.2.1",
-    "uuid": "^8.2.0"
+    "text-extensions": "^2.4.0",
+    "uuid": "^8.3.2"
   }
 }

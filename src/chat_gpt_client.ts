@@ -25,6 +25,7 @@ export class ChatGPTClient{
 
     async respond(chatGPTMessages: Array<ChatCompletionRequestMessage>) {
 
+        console.debug(JSON.stringify(chatGPTMessages));
 
         const configuration = new Configuration({
             apiKey: await this.workspace_configuration.get_apiKey()
@@ -44,7 +45,7 @@ export class ChatGPTClient{
             const response = await openAI.createChatCompletion(request);
 
             if (!response.data || !response.data.choices) {
-                
+                console.error(response);
                 return {
                     success: false,
                     text: response.statusText,
@@ -70,6 +71,7 @@ export class ChatGPTClient{
                 bad_api_key: response.status == 401
             } as ChatGPTResponse;
         } catch (error : any) {
+            console.error(error);
 			return {
                 success: false,
                 text: error,

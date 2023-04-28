@@ -175,5 +175,10 @@ export class WorkspaceConfiguration {
         else {
             throw `More than one ${property} from workspace with id ${id}`;
         }
-    }    
+    }
+    
+    async add_to_workspace_by_id<T extends HasID>(property : string, value : T) {
+        await this.remove_from_workspace_property_by_id(property, value.id);
+        await this.append_to_workspace_property(property, value);
+    }
 }
