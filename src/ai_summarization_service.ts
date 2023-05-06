@@ -7,6 +7,7 @@ import { WorkspaceConfiguration } from './workspace_configuration';
 import { Workspace } from './workspace';
 import { AIPromptService } from './ai_prompt_service';
 import { HasID } from './ai_com_types';
+import { PROMPTS } from './prompts';
 
 interface Summary extends HasID {
     hash : string
@@ -60,7 +61,7 @@ export class AISummarizationService {
             return editorTextSummary.summary;
         } 
 
-        const summaryCommands = await this.ai_prompt_service.getCommandResponse("WRITE_SUMMARY", editorText);
+        const summaryCommands = await this.ai_prompt_service.getCommandResponse("WRITE_SUMMARY", editorText, PROMPTS);
         const summary = summaryCommands.filter(command => command.verb === "BEGINSUMMARY")?.[0].arg1;
 
         if (!summary) {
@@ -87,12 +88,12 @@ export class AISummarizationService {
         if (!text) {
             return null;
         }
-        return await this.ai_prompt_service.getTextResponse("SUMMARIZE_TEXT", text);
+        return await this.ai_prompt_service.getTextResponse("SUMMARIZE_TEXT", text, PROMPTS);
     }
 
     private async askAIForDirectorySummary(uri : vscode.Uri) : Promise<string|null> {
         const directoryStructureString = await this.getDirectoryStructureString(uri);
-        const summary = this.ai_prompt_service.getTextResponse("SUMMARIZE_DIRECTORY_STRUCTURE", directoryStructureString);
+        const summary = this.ai_prompt_service.getTextResponse("SUMMARIZE_DIRECTORY_STRUCTURE", directoryStructureString, PROMPTS);
         return summary;
     }
 

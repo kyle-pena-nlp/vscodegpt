@@ -5,30 +5,43 @@ import { AICommand, HasID } from './ai_com_types';
 import { AISummarizationService } from './ai_summarization_service';
 import { Workspace } from './workspace';
 import { AIPromptService } from './ai_prompt_service';
-import { text } from 'stream/consumers';
+import { ProgressWindow } from "./progress_window";
+import { PROMPTS } from './prompts';
 
 interface Advice extends HasID {
   advice: string
 };
 
-class SelectionCommandWorkflow {
+class ReplaceSelectionCommandWorkflow {
 
   private ai_prompt_service : AIPromptService;
+  private ai_summarization_service : AISummarizationService;
+  private progressWindow : ProgressWindow;
 
-  constructor(ai_prompt_service : AIPromptService) {
+  constructor(ai_prompt_service : AIPromptService, ai_summarization_service : AISummarizationService, progressWindow : ProgressWindow) {
     this.ai_prompt_service = ai_prompt_service;
+    this.ai_summarization_service = ai_summarization_service;
+    this.progressWindow = progressWindow;
   }
 
-  async run(userCommand : string, context : Map<string,string>) {
-    const commands = await this.ai_prompt_service.getCommandResponse("WRITE_CODE", userCommand, context);
+  async run(userCommand : string, context : Map<string,string>) : Promise<string|undefined|'UserCancelled'> {
+    const commands = await this.progressWindow.wrapAsync("Generating code", () => this.ai_prompt_service.getCommandResponse("WRITE_CODE", userCommand, PROMPTS, context));
+    if (commands == 'UserCancelled') {
+      return 'UserCancelled'
+    }
+    if (!commands) {
+      return;
+    }
     const codeResponse = commands.filter(command => command.verb == "BEGINCODE")?.[0];
     if (!codeResponse) {
       return;
     }
     const code = codeResponse.arg1;
+    if (!code) {
+      return;
+    }
     return code;
   }
-
 }
 
 export class AIUserCommandHandler {
@@ -46,21 +59,34 @@ export class AIUserCommandHandler {
     }
 
     async giveSelectionCommand() {
+      
+      // Verify there is actually text selected
       const selection = this.getCurrentSelection();
       if (!selection) {
         return;
       }
+      
+      // Ask the user for directions
       const userCommand = await this.promptUserForCommand("Give the AI a command", "Tell me what to do.", "Write a function that...");
       if (!userCommand) {
         return;
       }
+
+      // Update the context
       const context = new Map<string,string>();
       this.addSelectedTextToContext(context);
-      const generatedText = await this.getGeneratedTextForOpenEditor(userCommand, context);
+
+      // Ask the AI for a replacement (cancellable)
+      const progressWindow = new ProgressWindow("Replacing selection...");
+      const generatedText = await progressWindow.wrapAsync(`Getting replacement from AI`, () => this.getGeneratedTextForOpenEditor(userCommand, context, progressWindow))
+      progressWindow.close();
       if (!generatedText) {
         return;
       }
+
+      // Replace the selection in the text editor
       this.replaceSelection(generatedText, selection);
+
     }
 
     private addSelectedTextToContext(context : Map<string,string>) {
@@ -179,7 +205,7 @@ export class AIUserCommandHandler {
       return textEditor.document.getText();
     }
 
-    private async getGeneratedTextForOpenEditor(userCommand : string, context : Map<string,string>) {
+    private async getGeneratedTextForOpenEditor(userCommand : string, context : Map<string,string>, progressWindow : ProgressWindow) {
       if (!userCommand) {
         return;
       }
@@ -187,7 +213,7 @@ export class AIUserCommandHandler {
         return;
       }
       await this.buildContextForOpenEditor(context);
-      const generatedText = await new SelectionCommandWorkflow(this.ai_prompt_service).run(userCommand, context);
+      const generatedText = await new ReplaceSelectionCommandWorkflow(this.ai_prompt_service, this.ai_summarization_service, progressWindow).run(userCommand, context);
       return generatedText;     
     }
 
@@ -235,7 +261,8 @@ export class AIUserCommandHandler {
       if (!userCommand) {
         return;
       }
-      const generatedText = await this.getGeneratedTextForOpenEditor(userCommand, context);
+      const progressWindow = new ProgressWindow("Generate code");
+      const generatedText = await this.getGeneratedTextForOpenEditor(userCommand, context, progressWindow);
       if (!generatedText) {
         return;
       }

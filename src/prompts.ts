@@ -1,8 +1,11 @@
 import { HasID } from "./ai_com_types";
 
-interface PromptDef extends HasID {
+
+export type ResponseGrammar = Record<string,string[]>;
+
+export interface PromptDef extends HasID {
     prompt : string,
-    responseGrammar : Record<string,string[]>
+    responseGrammar : ResponseGrammar
 };
 
 /*

@@ -3,6 +3,36 @@ const path = require('path');
 const fs = require('fs');
 const textExtensions = require('text-extensions');
 
+export enum WorkspacePathFailureReason {
+    NoOpenWorkspace,
+    MoreThanOneWorkspaceIsUnsupported
+}
+
+
+export function fromWorkspaceRelativeFilepath(relativeFilepath : string) : string|WorkspacePathFailureReason {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        return WorkspacePathFailureReason.NoOpenWorkspace
+    }
+    if (workspaceFolders.length > 1) {
+        return WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported
+    }
+    const workspaceRootUri = workspaceFolders[0].uri;
+    return vscode.Uri.joinPath(workspaceRootUri, relativeFilepath).fsPath;
+}
+
+export function toWorkspaceRelativeFilepath(absoluteFilepath : string) : string|WorkspacePathFailureReason {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        return WorkspacePathFailureReason.NoOpenWorkspace
+    }
+    if (workspaceFolders.length > 1) {
+        return WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported
+    }
+    const relativeFilePath = vscode.workspace.asRelativePath(absoluteFilepath);
+    return relativeFilePath;
+}
+
 export class Workspace {
 
     constructor() {

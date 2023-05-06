@@ -1,11 +1,13 @@
 
 import * as vscode from "vscode";
 import { ChatCompletionRequestMessage, ChatCompletionRequestMessageRoleEnum } from 'openai';
-import { PROMPTS } from "./prompts";
+import { PromptDef } from "./prompts";
 import { ChatGPTClient } from "./chat_gpt_client";
 import { WorkspaceConfiguration } from "./workspace_configuration";
 import { AICommandParser } from "./ai_command_parser";
 import { AICommand } from "./ai_com_types";
+
+export type AIResponseError = 'BadAPIKey' | 'RateLimited' | 'TokenLimited' | 'OtherAPIError';
 
 export class AIPromptService {
 
@@ -17,23 +19,22 @@ export class AIPromptService {
         this.chatClient = new ChatGPTClient(context);
     }
 
-    async getCommandResponse(prompt_key : string, promptText : string, context?: Map<string,string>) : Promise<AICommand[]> {
-        const responseText = await this.getTextResponse(prompt_key, promptText, context || new Map<string,string>());
+    async getCommandResponse(prompt_key : string, promptText : string, promptDefinitions : Map<string,PromptDef>, context?: Map<string,string>) : Promise<AICommand[]> {
+        const responseText = await this.getTextResponse(prompt_key, promptText, promptDefinitions, context || new Map<string,string>());
         if (!responseText) {
             return [];
         }
-        const promptDef = PROMPTS.get(prompt_key)!;
-        const prompt = promptDef.prompt;
+        const promptDef = promptDefinitions.get(prompt_key)!;
         const commandGrammars = Object.values(promptDef.responseGrammar);
         const parser = new AICommandParser(commandGrammars);
         const commands = parser.parse_commands(responseText);  
         return commands;      
     }
 
-    async getTextResponse(prompt_key : string, promptText : string, context? : Map<string,string>) : Promise<string|null> {        
-        const promptDef = PROMPTS.get(prompt_key)!;
-        const prompt = promptDef.prompt;
-        const request = await this.buildRequest(prompt, promptText, context || new Map<string,string>());
+    async getTextResponse(prompt_key : string, promptText : string, promptDefinitions : Map<string,PromptDef>, context? : Map<string,string>) : Promise<string|null> {        
+        const promptDef = promptDefinitions.get(prompt_key)!;
+        const systemPrompt = promptDef.prompt;
+        const request = await this.buildRequest(systemPrompt, promptText, context || new Map<string,string>());
         const response = await this.chatClient.respond(request);
 
         if (response.bad_api_key) {
@@ -52,8 +53,39 @@ export class AIPromptService {
 
         return responseText;
     }
+
+    async getAIResponse(systemPrompt : string|null, userPrompt : string, context_items : Map<string,string>) : Promise<AIResponseError|string > {
+        
+        try {
+            const request = await this.buildRequest(systemPrompt, userPrompt, context_items);
+            const response = await this.chatClient.respond(request);
+    
+            if (response.bad_api_key) {
+                return 'BadAPIKey';
+            }
+            
+            if (response.rate_limited) {
+                return 'RateLimited';
+            }
+    
+            // TODO: detect when response is token limited
+            
+            if (!response.success) {
+                return 'OtherAPIError';
+            }
+    
+            const responseText = response.text;
+    
+            return responseText;
+        }
+        catch(exception) {
+            console.debug(exception);
+            return 'OtherAPIError';
+        }
+
+    }
  
-    private async buildRequest(prompt : string, promptText: string, context_items : Map<string,string>) {
+    private async buildRequest(systemPrompt : string|null, userPrompt: string, context_items : Map<string,string>) {
 
         const messages = [];
         const SYSTEM_ROLE = ChatCompletionRequestMessageRoleEnum.System;
@@ -61,7 +93,10 @@ export class AIPromptService {
 
         // Per guidance, 3.5-turbo (v301) doesn't pay enough attention to system messages (https://platform.openai.com/docs/guides/chat/introduction)
         const ROLE_FOR_SYSTEM_MESSAGE = await this.workspace_configuration.get_AI_model() == "gpt-3.5-turbo" ? USER_ROLE : SYSTEM_ROLE;
-        messages.push({ role: ROLE_FOR_SYSTEM_MESSAGE, content: prompt } as ChatCompletionRequestMessage);      
+
+        if (systemPrompt) {
+            messages.push({ role: ROLE_FOR_SYSTEM_MESSAGE, content: systemPrompt } as ChatCompletionRequestMessage); 
+        }     
 
         for (const key of context_items.keys()) {
             const entry = context_items.get(key);
@@ -75,7 +110,7 @@ export class AIPromptService {
             messages.push(contextMessageToAI);
         }
 
-        messages.push({ role : USER_ROLE, content: "Your assignment: " + promptText });
+        messages.push({ role : USER_ROLE, content: userPrompt });
 
         return messages;        
     }
