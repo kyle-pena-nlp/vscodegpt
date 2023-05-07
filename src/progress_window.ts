@@ -42,7 +42,7 @@ export class ProgressWindow {
 
                 const updateProgress = () => { 
                     const current_fn_name = this.executingFnNames.at(-1);
-                    progress.report({ increment: 0, message: current_fn_name || this.name });
+                    progress.report({ message: current_fn_name || this.name });
                     return; 
                 };
 
@@ -88,6 +88,8 @@ export class ProgressWindow {
                         console.debug(`Successfully executed ${fn_name} for progress window ${this.name}`);
                         resolve(t);
                     }
+                }, (reason) => {
+                    console.debug(`${fn_name} failed during execution`)
                 }).finally(() => {
                     const fnNameIndex = this.executingFnNames.lastIndexOf(fn_name);
                     if (fnNameIndex !== -1) {

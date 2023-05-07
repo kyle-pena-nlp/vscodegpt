@@ -3,19 +3,16 @@ const path = require('path');
 const fs = require('fs');
 const textExtensions = require('text-extensions');
 
-export enum WorkspacePathFailureReason {
-    NoOpenWorkspace,
-    MoreThanOneWorkspaceIsUnsupported
-}
+export type WorkspacePathFailureReason = 'NoOpenWorkspace' | 'MoreThanOneWorkspaceIsUnsupported';
 
 
 export function fromWorkspaceRelativeFilepath(relativeFilepath : string) : string|WorkspacePathFailureReason {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
-        return WorkspacePathFailureReason.NoOpenWorkspace
+        return 'NoOpenWorkspace';
     }
     if (workspaceFolders.length > 1) {
-        return WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported
+        return 'MoreThanOneWorkspaceIsUnsupported';
     }
     const workspaceRootUri = workspaceFolders[0].uri;
     return vscode.Uri.joinPath(workspaceRootUri, relativeFilepath).fsPath;
@@ -24,13 +21,23 @@ export function fromWorkspaceRelativeFilepath(relativeFilepath : string) : strin
 export function toWorkspaceRelativeFilepath(absoluteFilepath : string) : string|WorkspacePathFailureReason {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
-        return WorkspacePathFailureReason.NoOpenWorkspace
+        return 'NoOpenWorkspace';
     }
     if (workspaceFolders.length > 1) {
-        return WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported
+        return 'MoreThanOneWorkspaceIsUnsupported';
     }
     const relativeFilePath = vscode.workspace.asRelativePath(absoluteFilepath);
     return relativeFilePath;
+}
+
+export function isInvalidWorkspace<T>(value : T|WorkspacePathFailureReason) : value is WorkspacePathFailureReason {
+    if (path == 'NoOpenWorkspace') {
+        return true;
+    }
+    else if (path == 'MoreThanOneWorkspaceIsUnsupported') {
+        return true;
+    }
+    return false;
 }
 
 export class Workspace {

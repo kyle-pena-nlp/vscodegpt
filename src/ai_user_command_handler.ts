@@ -3,46 +3,16 @@ import * as vscode from 'vscode';
 import { WorkspaceConfiguration } from "./workspace_configuration";
 import { AICommand, HasID } from './ai_com_types';
 import { AISummarizationService } from './ai_summarization_service';
-import { Workspace } from './workspace';
+import { Workspace, toWorkspaceRelativeFilepath, isInvalidWorkspace } from './workspace';
 import { AIPromptService } from './ai_prompt_service';
 import { ProgressWindow } from "./progress_window";
 import { PROMPTS } from './prompts';
+import { Agent } from './agent';
+import { GoalPlanningAgent } from './goal_planning_agent';
 
 interface Advice extends HasID {
   advice: string
 };
-
-class ReplaceSelectionCommandWorkflow {
-
-  private ai_prompt_service : AIPromptService;
-  private ai_summarization_service : AISummarizationService;
-  private progressWindow : ProgressWindow;
-
-  constructor(ai_prompt_service : AIPromptService, ai_summarization_service : AISummarizationService, progressWindow : ProgressWindow) {
-    this.ai_prompt_service = ai_prompt_service;
-    this.ai_summarization_service = ai_summarization_service;
-    this.progressWindow = progressWindow;
-  }
-
-  async run(userCommand : string, context : Map<string,string>) : Promise<string|undefined|'UserCancelled'> {
-    const commands = await this.progressWindow.wrapAsync("Generating code", () => this.ai_prompt_service.getCommandResponse("WRITE_CODE", userCommand, PROMPTS, context));
-    if (commands == 'UserCancelled') {
-      return 'UserCancelled'
-    }
-    if (!commands) {
-      return;
-    }
-    const codeResponse = commands.filter(command => command.verb == "BEGINCODE")?.[0];
-    if (!codeResponse) {
-      return;
-    }
-    const code = codeResponse.arg1;
-    if (!code) {
-      return;
-    }
-    return code;
-  }
-}
 
 export class AIUserCommandHandler {
 
@@ -50,188 +20,48 @@ export class AIUserCommandHandler {
     private ai_summarization_service : AISummarizationService;
     private ai_prompt_service : AIPromptService;
     private workspace : Workspace;
+    private context: vscode.ExtensionContext;
 
     constructor(context : vscode.ExtensionContext) {
         this.workspace_configuration = new WorkspaceConfiguration(context);
         this.ai_summarization_service = new AISummarizationService(context);
         this.ai_prompt_service = new AIPromptService(context);
         this.workspace = new Workspace();
+        this.context = context;
     }
 
-    async giveSelectionCommand() {
-      
-      // Verify there is actually text selected
-      const selection = this.getCurrentSelection();
-      if (!selection) {
-        return;
-      }
-      
-      // Ask the user for directions
-      const userCommand = await this.promptUserForCommand("Give the AI a command", "Tell me what to do.", "Write a function that...");
-      if (!userCommand) {
-        return;
-      }
-
-      // Update the context
-      const context = new Map<string,string>();
-      this.addSelectedTextToContext(context);
-
-      // Ask the AI for a replacement (cancellable)
-      const progressWindow = new ProgressWindow("Replacing selection...");
-      const generatedText = await progressWindow.wrapAsync(`Getting replacement from AI`, () => this.getGeneratedTextForOpenEditor(userCommand, context, progressWindow))
-      progressWindow.close();
-      if (!generatedText) {
-        return;
-      }
-
-      // Replace the selection in the text editor
-      this.replaceSelection(generatedText, selection);
-
-    }
-
-    private addSelectedTextToContext(context : Map<string,string>) {
-      const selectedText = this.getSelectedText();
-      if (!selectedText) {
-        return;
-      }
-      context.set("Code You Are Replacing", selectedText);
-    }
-
-    private getCurrentSelection() {
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-        return null;
-      }
-      return textEditor.selection;
-    }
-
-    private async replaceSelection(generatedText : string, selection : vscode.Selection) {
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-          return null;
-      }
-      await textEditor.edit(editBuilder => {
-        editBuilder.replace(selection, generatedText);
-      });      
-    }
-
-    private async buildContextForOpenEditor(context : Map<string,string>) {
-      await this.addExtensionOfFileForOpenEditor(context);
-      await this.possiblySummarizeCurrentFileContents(context);
-      //await this.addPreviousAndNextPartsOfSelectedLines(context);
-      await this.addPreviousAndNextLinesOfCode(context);
-    }
-
-    private async addExtensionOfFileForOpenEditor(context : Map<string,string>) {
-      const uri = await this.getCurrentEditorUri();
-      if (!uri) {
-        return;
-      }
-      const extname = path.extname(uri.path);
-      context.set("Current File Extension", extname);
-    }
-
-    private async possiblySummarizeCurrentFileContents(context : Map<string,string>) {
-      const text = this.getCurrentEditorText();
-      const uri = await this.getCurrentEditorUri();
-      if (!text) {
-        return;
-      }
-      if (!uri) {
-        return;
-      }
-      const summary = await this.ai_summarization_service.getOrMakeCachedEditorContentsSummary(text, uri);
-      if (summary) {
-        context.set("Summary of other contents in file, strictly for informative purposes", summary);
-      }
-    }
-
-    private async addPreviousAndNextLinesOfCode(context : Map<string,string>) {
-    
-      const positions = await this.getStartAndEndPosition();
-      if (!positions) {
-        return;
-      }
-      
-      const [startPos, endPos] = positions;
-
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-        return null;
-      }
-
-      let startLine = startPos.line;
-      while (startLine >= 0) {
-        const line = textEditor.document.lineAt(startLine);
-        if (!line.isEmptyOrWhitespace) {
-          
-          context.set("Previous Line of Code", line.text);
-          break;
+    async giveSelectionCommand() : Promise<undefined> {
+      try {
+        const goal = await this.promptUserForCommand("Tell me what to do", "How should I change this code?", "Add more comments");
+        if (!goal) {
+          return;
         }
-        startLine--;
-      }
 
-      
-      let endLine = endPos.line;
-      while (endLine < textEditor.document.lineCount) {
-        const line = textEditor.document.lineAt(endLine);
-        if (!line.isEmptyOrWhitespace) {
-          context.set("Next Line of Code", line.text);
-          break;
+
+        const progressWindow = new ProgressWindow("Replacing selected code");
+        const replaceCodePlanningAgent = new GoalPlanningAgent("The user would like you to replace the currently selected code with modified code.  This is how they would like you to modify the code: '" + goal + "'", null, null, this.context, progressWindow);
+        const activeEditorFilepath = await this.getCurrentEditorUri();
+        if (!activeEditorFilepath) {
+          return;
         }
-        endLine++;
-      }
-    }
+        const fsPath = toWorkspaceRelativeFilepath(activeEditorFilepath.fsPath);
+        
+        const currentlySelectedCode = this.getSelectedText();
+        if (!currentlySelectedCode) {
+          return;
+        }
 
-    private async getStartAndEndPosition() {
-      const currentSelection = await this.getCurrentSelection();
-      const cursorPosition = await this.getCurrentCursorPosition();
-      if (currentSelection) {
-        return [currentSelection.start, currentSelection.end]
+        replaceCodePlanningAgent.mergeInKnowledge(new Map<string,string>([
+          ["What is the filename that contains currently selected code?", fsPath],
+          ["What is the currently selected code?", currentlySelectedCode]
+        ]))
+        await replaceCodePlanningAgent.execute()
       }
-      else if (cursorPosition) {
-        return [cursorPosition, cursorPosition];
-      }
-      else {
-        return null;
-      }
-    }
-
-    private getCurrentEditorText() {
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-          return null;
-      }
-      return textEditor.document.getText();
-    }
-
-    private async getGeneratedTextForOpenEditor(userCommand : string, context : Map<string,string>, progressWindow : ProgressWindow) {
-      if (!userCommand) {
+      catch (exception) {
         return;
       }
-      if (!vscode.window.activeTextEditor) {
-        return;
-      }
-      await this.buildContextForOpenEditor(context);
-      const generatedText = await new ReplaceSelectionCommandWorkflow(this.ai_prompt_service, this.ai_summarization_service, progressWindow).run(userCommand, context);
-      return generatedText;     
     }
 
-    private getSelectedText() {
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-          return;
-      }
-      const selection = textEditor.selection;
-      if (!selection) {
-          return;
-      }
-      if (selection.isEmpty) {
-          return;
-      }
-      const selectedText = textEditor!.document.getText(selection);
-      return selectedText;
-    }
 
     async refreshEditorSummary() {
       throw new Error('Method not implemented.');
@@ -252,39 +82,18 @@ export class AIUserCommandHandler {
     }
     
     async giveEditorCommand() {
-      const context = new Map<string,string>();
-      const currentPosition = await this.getCurrentCursorPosition();
-      if (!currentPosition) {
+      try {
+        const goal = await this.promptUserForCommand("Tell me what to do", "What could should I write?", "Write a function that adds togther two numbers");
+        if (!goal) {
+          return;
+        }
+        const progressWindow = new ProgressWindow("Inserting code at current position");
+        const replaceCodePlanningAgent = new GoalPlanningAgent(goal, null, null, this.context, progressWindow);
+        await replaceCodePlanningAgent.execute()
+      }
+      catch (exception) {
         return;
       }
-      const userCommand = await this.promptUserForCommand("Give the AI a command", "Tell me what to do", "Write a function that adds two numbers");
-      if (!userCommand) {
-        return;
-      }
-      const progressWindow = new ProgressWindow("Generate code");
-      const generatedText = await this.getGeneratedTextForOpenEditor(userCommand, context, progressWindow);
-      if (!generatedText) {
-        return;
-      }
-      this.insertTextAtCurrentPosition(generatedText, currentPosition);
-    }
-
-    private async getCurrentCursorPosition() {
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-        return;
-      }
-      return textEditor.selection.active;
-    }
-
-    private async insertTextAtCurrentPosition(generatedText : string, position : vscode.Position) {
-      const textEditor = vscode.window.activeTextEditor;
-      if (!textEditor) {
-        return;
-      }      
-      await textEditor.edit(editBuilder => {
-        editBuilder.insert(position, generatedText);
-      });      
     }
 
     async refreshFileSummary(uri : vscode.Uri) {
@@ -318,6 +127,22 @@ export class AIUserCommandHandler {
       }
       return textEditor.document.uri;
     }
+
+    private getSelectedText() {
+      const textEditor = vscode.window.activeTextEditor;
+      if (!textEditor) {
+          return;
+      }
+      const selection = textEditor.selection;
+      if (!selection) {
+          return;
+      }
+      if (selection.isEmpty) {
+          return;
+      }
+      const selectedText = textEditor!.document.getText(selection);
+      return selectedText;
+    }      
 
     private async promptUserForCommand(title? : string|null, prompt? : string|null, placeholder? : string|null) : Promise<string|undefined> {
         const validateInput = (input : string) => {

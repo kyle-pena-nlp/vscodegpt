@@ -8,6 +8,7 @@ import { AICommandParser } from "./ai_command_parser";
 import { AICommand } from "./ai_com_types";
 
 export type AIResponseError = 'BadAPIKey' | 'RateLimited' | 'TokenLimited' | 'OtherAPIError';
+export type AIResponse = { response: string }
 
 export class AIPromptService {
 
@@ -34,6 +35,16 @@ export class AIPromptService {
     async getTextResponse(prompt_key : string, promptText : string, promptDefinitions : Map<string,PromptDef>, context? : Map<string,string>) : Promise<string|null> {        
         const promptDef = promptDefinitions.get(prompt_key)!;
         const systemPrompt = promptDef.prompt;
+
+
+        if (systemPrompt) {
+            console.debug(systemPrompt);
+        }
+
+        if (promptText) {
+            console.debug(promptText);
+        }
+
         const request = await this.buildRequest(systemPrompt, promptText, context || new Map<string,string>());
         const response = await this.chatClient.respond(request);
 
@@ -51,10 +62,28 @@ export class AIPromptService {
 
         const responseText = response.text;
 
+        console.debug(responseText);
+
         return responseText;
     }
 
-    async getAIResponse(systemPrompt : string|null, userPrompt : string, context_items : Map<string,string>) : Promise<AIResponseError|string > {
+    isFailureResponse<T>(value: T|AIResponseError) : value is AIResponseError {
+        if (value == 'BadAPIKey') {
+            return true;
+        }
+        else if (value == 'RateLimited') {
+            return true;
+        }
+        else if (value == 'OtherAPIError') {
+            return true;
+        }
+        else if (value == 'TokenLimited') {
+            return true;
+        }
+        return false;
+    }
+
+    async getAIResponse(systemPrompt : string|null, userPrompt : string, context_items : Map<string,string>) : Promise<AIResponseError|AIResponse > {
         
         try {
             const request = await this.buildRequest(systemPrompt, userPrompt, context_items);
@@ -76,7 +105,7 @@ export class AIPromptService {
     
             const responseText = response.text;
     
-            return responseText;
+            return { response: responseText };
         }
         catch(exception) {
             console.debug(exception);

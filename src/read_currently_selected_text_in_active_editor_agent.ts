@@ -3,7 +3,7 @@ import { Agent, AgentStatusReport, NodeMetadata } from "./agent";
 import { ProgressWindow } from './progress_window';
 
 
-class ReadCurrentlySelectedTextInActiveEditorAgent extends Agent {
+export class ReadCurrentlySelectedTextInActiveEditorAgent extends Agent {
 
     constructor(arg1 : string|null, arg2: string|null, boss: Agent, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
         super(arg1, arg2, boss, context, progressWindow);
@@ -11,15 +11,15 @@ class ReadCurrentlySelectedTextInActiveEditorAgent extends Agent {
 
     static nodeMetadata() : NodeMetadata {
         return new NodeMetadata(
-            ["GET-SELECTED-TEXT-IN-ACTIVE-EDITOR"],
-            ["GET-SELECTED-TEXT-IN-ACTIVE-EDITOR"],
-            "Gets the currently selected text in the open active editor",
+            ["GET-SELECTED-TEXT-IN-ACTIVE-EDITOR", "<quoted-string>"],
+            ["GET-SELECTED-TEXT-IN-ACTIVE-EDITOR", "memory-location-key"],
+            "You can get the currently selected text in the open active editor and store in your memory using the location key you specify",
             []
         );
     }    
 
     purpose(): string {
-        return "Reads currently selected text in the active editor"
+        return `Read currently selected text in the active editor and store it in the memory location key: '${this.arg1}'`;
     }
 
     async execute_impl(): Promise<AgentStatusReport> {
@@ -27,7 +27,10 @@ class ReadCurrentlySelectedTextInActiveEditorAgent extends Agent {
         if (!selectedText) {
             return { state: 'FailedUnspecifiedError', message: "Could not get selected text" };
         }
-        this.storeKnowledgeItem("Currently Selected Text In Active Editor", selectedText);
+        if (!this.arg2) {
+            return { state: 'FailedInvalidArgument' };
+        }
+        this.storeKnowledgeItem(this.arg2, selectedText);
         return { state: 'Finished', "message": "Got currently selected text in active editor" }
     }
 

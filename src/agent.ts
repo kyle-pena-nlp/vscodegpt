@@ -16,7 +16,8 @@ export type AgentFailureState  = AIResponseError | 'UserCancelled' |
 'FailedUnspecifiedError'|
 'FailedDidNotAchieveGoal'|
 'FailedUserDidNotRespond'|
-'FailedExceededTokenLimit';
+'FailedExceededTokenLimit'|
+'FailedInsufficientAIResponse';
 
 // This is the execution result of an Agent's implementation
 export type AgentState = 'NotStarted'|'Finished'|AgentFailureState;
@@ -78,6 +79,10 @@ export abstract class Agent {
         }
         catch (exception) {
             this.status = { state: 'FailedUnspecifiedError', message: "Failed to an unspecified error", debug: exception };
+            // hack.
+            if (this.boss === null) {
+                this.progressWindow.close();
+            }
         }
     }
 
@@ -87,7 +92,7 @@ export abstract class Agent {
         this.knowledge.set(question, answer);
     }
 
-    protected mergeInKnowledge(newKnowledge : QuestionsAndAnswers) {
+    mergeInKnowledge(newKnowledge : QuestionsAndAnswers) {
         for (const key of newKnowledge.keys()) {
             this.knowledge.set(key, newKnowledge.get(key)!);
         }
@@ -141,6 +146,9 @@ export abstract class Agent {
             return true;
         }
         else if (value == 'UserCancelled') {
+            return true;
+        }
+        else if (value == 'FailedInsufficientAIResponse')  {
             return true;
         }
         else {
@@ -205,7 +213,7 @@ export class NodeMetadata {
     }
 
     getAgentCtor(verb : string) {
-        return this.agentPalette.filter(agent => agent.nodeMetadata().getVerb())[0];
+        return this.agentPalette.filter(agent => agent.nodeMetadata().getVerb() == verb)[0];
     }
 
     getVerb() {

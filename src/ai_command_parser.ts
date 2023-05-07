@@ -3,6 +3,12 @@ import { AIAction, AICommand } from "./ai_com_types";
 import { v4 as uuidv4 } from 'uuid';
 
 export class AICommandParser {
+    /*
+        The command parser translates unstructured text into structured AICommand objects
+        It's how we translate AI responses into action plans ("commands")
+        The AI is primed to respond according to a structured format that can be parsed via prompt engineering
+        (see AINodeMetadata in Agent.ts)
+    */
 
     private command_grammars : Array<Array<string>>;
 
@@ -137,10 +143,9 @@ export class AICommandParser {
             const reduced_input = input.replace(pattern, "");
             return [reduced_input,content,true];
         }
-        // Match a literal token.
+        // Match a literal token. (ignores numbering or hyphen listing)
         else {
-            // TODO: error condition when the token interpolated into the command has single or double quotes
-            const pattern = RegExp(`^\\s*((["']${token}["'])|(\\b${token}\\b))`);
+            const pattern = RegExp(`^\\s*(?:(?:(?:\\d+\\.)|(?:-))\\s*)?((["']${token}["'])|(\\b${token}\\b))`);
             const match = input.match(pattern);
             if (match) {
                 const content = match[1];

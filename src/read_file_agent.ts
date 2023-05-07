@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { Agent, AgentStatusReport, NodeMetadata } from "./agent";
-import { WorkspacePathFailureReason, fromWorkspaceRelativeFilepath } from "./workspace";
+import { WorkspacePathFailureReason, fromWorkspaceRelativeFilepath, isInvalidWorkspace } from "./workspace";
 import { ProgressWindow } from './progress_window';
 
 
-class ReadFileAgent extends Agent {
+export class ReadFileAgent extends Agent {
 
     constructor(arg1 : string|null, arg2 : string|null, boss: Agent, context : vscode.ExtensionContext, progressWindow : ProgressWindow) {
         super(arg1,arg2,boss,context,progressWindow);
@@ -12,15 +12,15 @@ class ReadFileAgent extends Agent {
 
     static nodeMetadata(): NodeMetadata {
         return new NodeMetadata(
-            ["READFILE", "<quoted-string>"],
-            ["READFILE", "filepath-to-read"],
-            "Reads the contents of a file from a filepath (relative to the workspace root)",
+            ["READFILE", "<quoted-string>", "<quoted-string>"],
+            ["READFILE", "filepath-to-read", "memory-location-key"],
+            "You can read the contents of a file and store it in the memory location key that you choose",
             []
         );
     }
 
     purpose(): string {
-        return `Reads file at filepath: "${this.arg1}"`;
+        return `Read file at filepath: '${this.arg1}' and store it in the memory location key '${this.arg2}'`;
     }
 
     async execute_impl(): Promise<AgentStatusReport> {
@@ -28,11 +28,8 @@ class ReadFileAgent extends Agent {
             return { state: 'FailedMissingArgument', message: "Must supply file to read" };
         }
         const workspaceRelativeFilepath = fromWorkspaceRelativeFilepath(this.arg1);
-        if (workspaceRelativeFilepath == WorkspacePathFailureReason.NoOpenWorkspace) {
-            return { state: 'FailedInvalidArgument', message: "No workspace is open" };
-        }
-        if (workspaceRelativeFilepath == WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported) {
-            return { state: 'FailedInvalidArgument', message: "Multiple workspaces are not supported"};
+        if (isInvalidWorkspace(workspaceRelativeFilepath)) {
+            return { state: 'Failed', message: 'Invalid workspace' };
         }
         const uri = vscode.Uri.file(workspaceRelativeFilepath);
         try{

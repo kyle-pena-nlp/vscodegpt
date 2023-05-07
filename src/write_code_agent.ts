@@ -5,7 +5,7 @@ import { AICommandParser } from './ai_command_parser';
 import { KnowledgeSelector } from './knowledge_selector';
 import { ProgressWindow } from './progress_window';
 
-class WriteCodeAgent extends Agent {
+export class WriteCodeAgent extends Agent {
 
     private ai_prompt_service : AIPromptService;
 
@@ -16,26 +16,30 @@ class WriteCodeAgent extends Agent {
 
     static nodeMetadata() : NodeMetadata {
         return new NodeMetadata(
-            ["WRITE-CODE", "<until-EOL>"],
-            ["WRITE-CODE", "<requirements-statement>"],
-            "Writes code that fulfills the stated requirements",
+            ["WRITE-CODE", "<quoted-string>", "<until-EOL>"],
+            ["WRITE-CODE", "memory-location-key", "<requirements-statement>"],
+            "You can write brand new code that fulfills requirements you choose, and store the result in the memory-location-key of your choosing",
             []
         );
     }  
 
     purpose(): string {
-        return `Writes code that fulfills these requirements: ${this.arg1}`;
+        return `Write code that fulfills these requirements: '${this.arg2}'. Store it in memory location key '${this.arg1}'`;
     }
 
     async execute_impl(): Promise<AgentStatusReport> {
 
         if (!this.arg1) {
+            return { state: 'FailedInvalidArgument', message: "Memory key not specified for storing code" };
+        }
+
+        if (!this.arg2) {
             return { state: 'FailedInvalidArgument', message: "Goal not supplied for writing code" };
         }
 
         // select relavent knowledge to write code
         const codeWritingKnowledgeSelectionPrompt = [
-            `You have been asked to write code to: "${this.arg1}"`,
+            `You have been asked to write code to: "${this.arg2}"`,
             `You may need to gather some knowledge items in order to write this code.`
         ]
         const knowledgeSelector = new KnowledgeSelector(this.context);
@@ -62,12 +66,12 @@ class WriteCodeAgent extends Agent {
         const no_context = new Map<string,string>();
         const response = await this.async_progress(() => this.ai_prompt_service.getAIResponse(null, writeCodePrompt, no_context), `Generating back to ${this.arg1}`);
         if (this.isFailure(response)) {
-            return response;
+            return { state: response };
         }
 
         const parseCodeGrammar = ["BEGINCODE", "<until-ENDCODE>"];
         const parser = new AICommandParser([parseCodeGrammar]);
-        const parsedResponse = parser.parse_commands(response);
+        const parsedResponse = parser.parse_commands(response.response);
         const code = parsedResponse.filter(c => c.verb == "BEGINCODE")[0];
         if (!code) {
             return { state: 'FailedDidNotAchieveGoal' };
@@ -78,7 +82,7 @@ class WriteCodeAgent extends Agent {
         }
 
         // Make note of it
-        this.storeKnowledgeItem(`Code written to fulfill requirement: "${this.arg1}"`, codeText);
+        this.storeKnowledgeItem(this.arg1, codeText);
         return { state: 'Finished' };
     }
 }

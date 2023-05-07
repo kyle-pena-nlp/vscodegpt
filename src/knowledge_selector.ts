@@ -30,7 +30,6 @@ export class KnowledgeSelector {
         // set up the prompt
         const numberedKnowledgeList = [...knowledge.keys()].map((question,index) => (index+1).toString(10) + ". " + question);
         const selectionPromptLines = [    
-            `Please select relevant items from the below list.`,
             `Respond only with the numbers of the items, one per line, in this format: SELECT <number>`,
             `If none of the knowledge is relevant, respond on a single line: NONE`,
             ...numberedKnowledgeList
@@ -42,13 +41,15 @@ export class KnowledgeSelector {
         const userPrompt = (userPromptLines).join("\n");
         const no_context = new Map<string,string>();
         const aiResponse = await this.ai_prompt_service.getAIResponse(null, userPrompt, no_context);
-
+        if (this.ai_prompt_service.isFailureResponse(aiResponse)) {
+            return aiResponse;
+        }
         // error handling.
 
         const responseParser = new AICommandParser(responseGrammar);
         const selectedKnowledge = [];
         if (aiResponse) {
-            const selections = responseParser.parse_commands(aiResponse).filter(selection => selection.verb.toLowerCase() == "select");
+            const selections = responseParser.parse_commands(aiResponse.response).filter(selection => selection.verb.toLowerCase() == "select");
             const numbers = selections.map(selection => selection.arg1)
             for (const number of numbers) {
                 if (!number) {

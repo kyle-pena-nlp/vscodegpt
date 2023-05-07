@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { Agent, AgentStatusReport, NodeMetadata } from './agent';
 import { ProgressWindow } from './progress_window';
 
-class RequestClarificationAgent extends Agent {
+export class RequestClarificationAgent extends Agent {
 
     constructor(arg1 : string|null, arg2: string|null, boss: Agent, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
         super(arg1, arg2, boss, context, progressWindow);
@@ -11,30 +11,34 @@ class RequestClarificationAgent extends Agent {
 
     static nodeMetadata() : NodeMetadata {
         return new NodeMetadata(
-            ["REQUEST-CLARIFICATION", "<until-EOL>"],
-            ["REQUEST-CLARIFICATION", "clarification-question"],
-            "Requests a clarification from a human being in order to make the details or intent of a goal more clear",
+            ["REQUEST-CLARIFICATION", "<quoted-string>", "<until-EOL>"],
+            ["REQUEST-CLARIFICATION", "memory-location-key", "clarification-question"],
+            "You can request a clarification from a human being but only if it is absolutely impossible to proceed without additional information. You can store the response in a memory-location-key of your choosing.",
             []
         );
     }
 
     purpose(): string {
-        return `Requests a clarification from a human being in order to better understand the intent of a goal`;
+        return `Request a clarification from a human being and store it in memory location key '${this.arg1}'`;
     }
 
     async execute_impl(): Promise<AgentStatusReport> {
         try
         {
-            if (!this.arg1) {
+            if (!this.arg2) {
                 return { state: 'FailedMissingArgument', message: "Question to user not provided" };
             }
 
-            const userResponse = await this.promptUserForCommand("I need you to clarify something for me...", this.arg1, "Your answer...");
+            const userResponse = await this.promptUserForCommand("I need you to clarify something for me...", this.arg2, "Your answer...");
             if (!userResponse) {
                 return { state: 'FailedUserDidNotRespond', message: "User chose not to respond to request for clarification" };
             }
 
-            this.storeKnowledgeItem(`Needs Clarification for goal: "${this.arg1}"`, userResponse);
+            if (!this.arg1) {
+                return { state: 'FailedInvalidArgument' };
+            }
+
+            this.storeKnowledgeItem(this.arg1, userResponse);
             return { state: 'Finished', message: `Got clarification from user for goal: ${this.arg1}` };
         }
         catch (exception) {

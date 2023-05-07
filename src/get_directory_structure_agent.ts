@@ -4,9 +4,9 @@ import { AIPromptService, AIResponseError } from "./ai_prompt_service";
 import { Agent, AgentStatusReport, NodeMetadata } from "./agent"
 import { ProgressWindow } from "./progress_window";
 import { AICommandParser } from "./ai_command_parser";
-import { WorkspacePathFailureReason, fromWorkspaceRelativeFilepath, toWorkspaceRelativeFilepath } from './workspace';
+import { WorkspacePathFailureReason, fromWorkspaceRelativeFilepath, toWorkspaceRelativeFilepath, isInvalidWorkspace } from './workspace';
 
-class GetDirectoryStructureAgent extends Agent {
+export class GetDirectoryStructureAgent extends Agent {
 
     constructor(arg1 : string|null, arg2: string|null, boss: Agent, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
         super(arg1, arg2, boss, context, progressWindow);
@@ -14,15 +14,15 @@ class GetDirectoryStructureAgent extends Agent {
 
     static nodeMetadata() : NodeMetadata {
         return new NodeMetadata(
-            ["GET-DIRECTORY-STRUCTURE-DESCRIPTION", "<quoted-string>"],
-            ["GET-DIRECTORY-STRUCTURE-DESCRIPTION", "workspace-root-relative-directory-filepath"],
-            "Describes the structure of the directory of the requested relative path (which is relative to the workspace root)",
+            ["GET-DIRECTORY-STRUCTURE-DESCRIPTION", "<quoted-string>", "<quoted-string>"],
+            ["GET-DIRECTORY-STRUCTURE-DESCRIPTION", "workspace-root-relative-directory-filepath", "memory-location-key"],
+            "You can read the structure of the directory of the requested relative path (which is relative to the workspace root), storing the result into your memory by a key that you choose and can reference later",
             []
         );
     }
 
     purpose(): string {
-        return `Describes the structure of the directory at the workspace root relative path: "${this.arg1}"`;
+        return `Get the directory structure of '${this.arg1}' and store it in '${this.arg2}'`;
     }
     
     async execute_impl(): Promise<AgentStatusReport> {
@@ -32,11 +32,8 @@ class GetDirectoryStructureAgent extends Agent {
         }
 
         const absoluteFilepath = fromWorkspaceRelativeFilepath(this.arg1);
-        if (absoluteFilepath == WorkspacePathFailureReason.NoOpenWorkspace) {
-            return { state: 'Failed', message: "No open workspace" };
-        }
-        else if (absoluteFilepath == WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported) {
-            return { state: 'Failed', message: "Multiple root workspaces not supported" };
+        if (isInvalidWorkspace(absoluteFilepath)) {
+            return { state: 'Failed', message: "Invalid workspace" };
         }
 
         const uri = vscode.Uri.file(absoluteFilepath);
@@ -55,18 +52,19 @@ class GetDirectoryStructureAgent extends Agent {
                 const fileTypeString = fileType === vscode.FileType.Directory ? 'Directory' : 'File';
                 const filepath = vscode.Uri.joinPath(vscode.Uri.file(absoluteFilepath), fileName);
                 const workspaceRelativeFilepath = toWorkspaceRelativeFilepath(filepath.fsPath);
-                if (workspaceRelativeFilepath == WorkspacePathFailureReason.NoOpenWorkspace) {
-                    return { state: 'Failed', message: "No open workspace" };
-                }
-                else if (workspaceRelativeFilepath == WorkspacePathFailureReason.MoreThanOneWorkspaceIsUnsupported) {
-                    return { state: 'Failed', message: "Multiple root workspaces not supported" };
-                }                
+                if (isInvalidWorkspace(workspaceRelativeFilepath)) {
+                    return { state: 'Failed', message: "Invalid workspace" };
+                }               
                 summary[workspaceRelativeFilepath] = fileTypeString;
             });
 
             const summaryString = JSON.stringify(summary);
 
-            this.storeKnowledgeItem("Contents of workspace-relative directory ${this.arg1}", summaryString);
+            if (!this.arg2) {
+                return { state: 'FailedInvalidArgument' };
+            }
+
+            this.storeKnowledgeItem(this.arg2, summaryString);
 
             return { state: 'Finished' };
         }
