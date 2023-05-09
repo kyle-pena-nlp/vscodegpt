@@ -48,47 +48,87 @@ export class GoalPlanningAgent extends Agent {
         return `${this.arg1}`;
     }
 
+    shareKnowledgeWithBoss_impl(): void {
+        /*if (!this.boss) {
+            return;
+        }
+        if (!this.arg1) {
+            return;
+        }*/
+        // TODO: dynamic knowledge selector
+        //this.boss.mergeInKnowledge(this.selectKnowledge([this.arg1]));
+        return;
+    }
+        
+    triggersReplan(): boolean {
+        return false;
+    }    
+
     async execute_impl() : Promise<AgentStatusReport> {
 
-        let currentMinionIndex = 0;
-        
+        this.progressWindow.open();
+        let currentMinionIndex = -1;
+        let needsPlanning = true;
+        let maxMinionSteps = 50; // TODO: make me configuration.
+
         while(true) {
-            
-            // Use this knowledge to create a new plan to finish executing the goal
-            const newMinions = await this.createPlan();
-            if (this.isFailure(newMinions)) {
-                return { state: newMinions };
-            }
-            
-            // If there is nothing left to be done, finish.
-            if (newMinions.length == 0) {
+
+            // Move to the next minion
+            currentMinionIndex += 1;
+
+            if (currentMinionIndex >= maxMinionSteps) {
+                console.debug("Exceeded max execution steps.")
                 break;
             }
+            
+            if (needsPlanning) {
 
-            // Replace the rest of the plan with the revised plan
-            this.minions.splice(currentMinionIndex, this.minions.length - (currentMinionIndex + 1), ...newMinions);
+                // Use this knowledge to create a new plan to finish executing the goal
+                const newMinions = await this.createPlan();
+                if (this.isFailure(newMinions)) {
+                    return { state: newMinions };
+                }
+                
+                // If there is nothing left to be done, finish.
+                // TODO: explitly check for 'ACHIEVED', 'REFUSE', 'IMPOSSIBLE' responses
+                if (newMinions.length == 0) {
+                    break;
+                }
+
+                // Replace the rest of the plan with the revised plan
+                this.minions.splice(currentMinionIndex, this.minions.length - (currentMinionIndex + 1), ...newMinions);
+            }
 
             // Get the first new minion
             const currentMinion = this.minions.at(currentMinionIndex)!;
 
-            // Execute it
-            await this.async_progress(() => currentMinion.execute(), currentMinion.purpose());
+            needsPlanning = false;
 
-            if (currentMinion.status.state == 'UserCancelled') {
-                return { state: 'UserCancelled' };
-            }            
-
-            // Absorb any knowledge it gathered
-            const relevantKnowledgeFromMinion = await this.askAIToSelectKnowledgeFromMinion(currentMinion);
-            if (this.isFailure(relevantKnowledgeFromMinion)) {
-                return { state: relevantKnowledgeFromMinion };
+            // If there are no new minions to execute, trigger one last replan to confirm completion of plan
+            if (!currentMinion) {
+                needsPlanning = true;
+                continue;
             }
 
-            // TODO: knowledge rectification when keys overlap?  Should probably do that in batch. For now, just prefer minion knowledge.
-            this.mergeInKnowledge(relevantKnowledgeFromMinion)
+            // Otherwise, execute it
+            await this.async_progress(() => currentMinion.execute(), currentMinion.purpose());
 
-            // Move to the next minion
-            currentMinionIndex += 1;
+            // Then check the state of the executed minion
+
+            // Some kinds of errors you can't recover from... propogate these up the callstack
+            if (this.isFatalFailure(currentMinion.status.state)) {
+                return { state: currentMinion.status.state };
+            }
+            
+            // Otherwise, any kind of failure of any step causes dynamic replanning
+            if (this.isFailure(currentMinion.status.state)) {
+                needsPlanning = true;
+                continue;
+            }
+
+            needsPlanning = needsPlanning || currentMinion.triggersReplan();
+
+            currentMinion.shareKnowledgeWithBoss();
         }
 
         try {
@@ -165,10 +205,10 @@ export class GoalPlanningAgent extends Agent {
             ...( knowledgeForPlanning.length ? [`And this is some relevant knowledge from the memory bank:`, ...knowledgeForPlanning ] : []),
             `In order to finish, you can create a series of commands in the following formats:`,
             ...bulletedActionsListForPrompt,
-            `Please create your plan by creating a list of commands using the format above.`,
+            `Please create your plan by creating a list of commands using the format above, but in a logical order that can be executed from top to bottom without issues.`,
             `When you write a command, substitute values of your choosing for each placeholder values (placeholder values look like this: <placeholder-value>)`,
             `Start each new command on a new line with just the command.`,
-            `Be methodical and go step-by-step. Do not use memory location keys if they have not had contents stored in them by a prior step.`,
+            `Be methodical and go step-by-step. Do not reference a memory location key unless it has had a value stored in it by a prior step.`,
             `Do not include commands if you do not have enough information to completely specify all of their arguments`,
             `If you would like to refuse, respond on a single line with: REFUSE`,
             `If achieving the goal is impossible using the above commands, respond on a single line with: IMPOSSIBLE`,

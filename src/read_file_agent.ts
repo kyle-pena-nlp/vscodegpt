@@ -14,7 +14,7 @@ export class ReadFileAgent extends Agent {
         return new NodeMetadata(
             ["READFILE", "<quoted-string>", "<quoted-string>"],
             ["READFILE", "filepath-to-read", "memory-location-key"],
-            "You can read the contents of a file and store it in the memory location key that you choose",
+            "You can read the contents of a file and store it in the memory location key that you choose.  This will contain the file contents, not the currently selected user text.",
             []
         );
     }
@@ -22,6 +22,21 @@ export class ReadFileAgent extends Agent {
     purpose(): string {
         return `Read file at filepath: '${this.arg1}' and store it in the memory location key '${this.arg2}'`;
     }
+
+    shareKnowledgeWithBoss_impl(): void {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg2) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg2]));
+        return;
+    }  
+    
+    triggersReplan(): boolean {
+        return false;
+    }    
 
     async execute_impl(): Promise<AgentStatusReport> {
         if (!this.arg1) {

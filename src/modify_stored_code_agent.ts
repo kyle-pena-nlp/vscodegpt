@@ -26,6 +26,22 @@ export class ModifyStoredCodeAgent extends Agent {
     purpose(): string {
         return `Modify the code stored in ${this.arg1} according to these instructions: ${this.arg2}`;
     }
+
+    shareKnowledgeWithBoss_impl(): void {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg1) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg1]));
+        return;
+    }
+
+    triggersReplan(): boolean {
+        return false;
+    }    
+
     async execute_impl(): Promise<AgentStatusReport> {
         
         if (!this.arg1) {

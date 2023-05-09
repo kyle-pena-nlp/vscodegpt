@@ -8,3 +8,5 @@ package-lock.json
 node_modules/
 archive/
 archive
+src/filereader.html
+filereader.html

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { CONSTANTS } from './constants';
 import { WorkspaceConfiguration } from './workspace_configuration';
-import { maybe_do_first_run } from './first_run';
+import { maybeDoFirstRun, resetIsFirstRun, viewWelcomeScreen } from './first_run';
 import { BackgroundProcess } from './background_process';
 import { AIUserCommandHandler } from './ai_user_command_handler';
 
@@ -83,6 +83,14 @@ export async function activate(context: vscode.ExtensionContext) {
       await userCommandHandler.giveSelectionCommand();
     }));
 
+    let resetIsFirstRunCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.resetIsFirstRun`, logExceptions( async () => {
+      await resetIsFirstRun(context);
+    }));
+
+    let viewWelcomeScreenCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.viewWelcomeScreen`, logExceptions( async () => {
+      await viewWelcomeScreen();
+    }));    
+
   
   context.subscriptions.push(startAIassistantCommand);
   context.subscriptions.push(stopAIassistantCommand);
@@ -102,8 +110,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(giveEditorCommandCommand);
 
+  context.subscriptions.push(resetIsFirstRunCommand);
+  context.subscriptions.push(viewWelcomeScreenCommand);
 
-  maybe_do_first_run(context);
+
+  maybeDoFirstRun(context);
 
 }
 

@@ -22,6 +22,21 @@ export class ReplaceSelectedCodeAgent extends Agent {
         return `Replace the user's currently selected code with the code stored at memory location key '${this.arg1}'`;
     }
 
+    shareKnowledgeWithBoss_impl(): void {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg1) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg1]));
+        return;
+    }    
+    
+    triggersReplan(): boolean {
+        return false;
+    }    
+
     async execute_impl(): Promise<AgentStatusReport> {
 
         const knowledgeSelector = new KnowledgeSelector(this.context);

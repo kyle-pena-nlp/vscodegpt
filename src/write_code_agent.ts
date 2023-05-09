@@ -17,8 +17,8 @@ export class WriteCodeAgent extends Agent {
     static nodeMetadata() : NodeMetadata {
         return new NodeMetadata(
             ["WRITE-CODE", "<quoted-string>", "<until-EOL>"],
-            ["WRITE-CODE", "memory-location-key", "<requirements-statement>"],
-            "You can write brand new code that fulfills requirements you choose, and store the result in the memory-location-key of your choosing",
+            ["WRITE-CODE", "memory-location-key", "<technical-requirements-statement>"],
+            "You can write brand new code that fulfills requirements you choose, and store the result in the memory-location-key of your choosing.  This is for new code, not modifying existing code.",
             []
         );
     }  
@@ -26,6 +26,21 @@ export class WriteCodeAgent extends Agent {
     purpose(): string {
         return `Write code that fulfills these requirements: '${this.arg2}'. Store it in memory location key '${this.arg1}'`;
     }
+
+    shareKnowledgeWithBoss_impl(): void {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg1) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg1]));
+        return;
+    }    
+    
+    triggersReplan(): boolean {
+        return false;
+    }    
 
     async execute_impl(): Promise<AgentStatusReport> {
 

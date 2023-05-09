@@ -19,6 +19,8 @@ export type AgentFailureState  = AIResponseError | 'UserCancelled' |
 'FailedExceededTokenLimit'|
 'FailedInsufficientAIResponse';
 
+export type FatalAgentError = 'UserCancelled' | 'RateLimited' | 'OtherAPIError' | 'BadAPIKey';
+
 // This is the execution result of an Agent's implementation
 export type AgentState = 'NotStarted'|'Finished'|AgentFailureState;
 
@@ -34,6 +36,9 @@ export type ClassWhichDescendsFromAgent = {
 
 export type Palette = Array<ClassWhichDescendsFromAgent>;
 
+// TODO: state for serialization.  pausing from progress window.  AI command panel view.
+// Agents for determining resource URLs, determining dependency lists, fetching github resources at URLs, reading code structure (folds), extracting folds
+// Make memory bank items lambdas.  Institute dirty hash chain?
 
 export abstract class Agent {
 
@@ -98,6 +103,23 @@ export abstract class Agent {
         }
     }
 
+    shareKnowledgeWithBoss() : void {
+        if (!this.boss) {
+            return;
+        }
+        this.shareKnowledgeWithBoss_impl();
+    }
+
+    abstract triggersReplan() : boolean;
+
+    protected abstract shareKnowledgeWithBoss_impl() : void;
+
+    protected selectKnowledge(selection : string[]) {
+        let selectedKeys = selection;
+        const entries = [...this.knowledge.entries()].filter(entry => selectedKeys.includes(entry[0]));
+        return new Map<string,string>(entries);
+    }
+
     protected async_progress<T>(fn : () => Promise<T>, title : string) : Promise<T|'UserCancelled'>
     {
         return this.progressWindow.wrapAsync<T>(title, fn);
@@ -109,6 +131,22 @@ export abstract class Agent {
 
     protected progress<T>(fn : () => T, title : string): T|'UserCancelled' {
         return this.progressWindow.wrap(title, fn);
+    }
+
+    isFatalFailure<T>(value : T|AgentState) : value is FatalAgentError {
+        if (value == 'BadAPIKey') {
+            return true;
+        }
+        else if (value == 'RateLimited') {
+            return true;
+        }
+        else if (value == 'UserCancelled') {
+            return true;
+        }
+        else if (value == 'OtherAPIError') {
+            return true;
+        }
+        return false;
     }
 
     isFailure<T>(value : T|AgentState) : value is AgentFailureState {

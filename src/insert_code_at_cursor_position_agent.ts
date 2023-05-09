@@ -17,6 +17,14 @@ export class InsertCodeAtCursorPosition extends Agent {
         return `Insert at the user's current cursor position the code stored in memory location key '${this.arg1}'`;
     }
 
+    shareKnowledgeWithBoss_impl(): void {
+        return;
+    }    
+
+    triggersReplan(): boolean {
+        return false;
+    }    
+
     async execute_impl(): Promise<AgentStatusReport> {
 
         // TODO: this is now wrong
@@ -28,16 +36,14 @@ export class InsertCodeAtCursorPosition extends Agent {
 
         const knowledge = knowledgeSelector.getAgentAndBossKnowledge(this);
 
-        const writtenCode = await this.async_progress(() => knowledgeSelector.selectRelevantKnowledgeUsingAI(promptLines, knowledge), "Picking which code to insert at the current cursor position");
-
-        if (this.isFailure(writtenCode)) {
-            return { state: writtenCode };
+        if (!this.arg1) {
+            return { state: 'FailedMissingArgument' };
         }
+    
+        const writtenCode = knowledge.get(this.arg1);
 
-        const code = [ ...writtenCode.values() ][0];
-
-        if (!code) {
-            return { state: 'FailedInsufficientAIResponse' };
+        if (!writtenCode) {
+            return { state: 'Failed' }; // TODO: error code for missing item from memory bank
         }
 
         const currentPosition = await this.getCurrentCursorPosition();
@@ -46,7 +52,7 @@ export class InsertCodeAtCursorPosition extends Agent {
         }
 
         try {
-            await this.insertTextAtCurrentPosition(code, currentPosition);
+            await this.insertTextAtCurrentPosition(writtenCode, currentPosition);
             return { state: 'Finished' };
         }
         catch (exception) {

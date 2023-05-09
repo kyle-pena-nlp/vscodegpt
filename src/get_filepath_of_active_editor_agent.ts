@@ -8,6 +8,7 @@ import { AICommandParser } from "./ai_command_parser";
 import { WorkspacePathFailureReason, isInvalidWorkspace, toWorkspaceRelativeFilepath } from './workspace';
 
 export class GetFilepathOfActiveEditorAgent extends Agent {
+
     constructor(arg1 : string|null, arg2 : string|null, boss: Agent, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
         super(arg1, arg2, boss, context, progressWindow);
     }
@@ -25,6 +26,21 @@ export class GetFilepathOfActiveEditorAgent extends Agent {
         return `Return the filepath of the current active editor window and store it in memory location key '${this.arg1}'`;
     }
 
+    shareKnowledgeWithBoss_impl(): void {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg1) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg1]));
+        return;
+    }
+    
+    triggersReplan(): boolean {
+        return false;
+    }    
+
     async execute_impl(): Promise<AgentStatusReport> {
         const activeEditor = vscode.window.activeTextEditor;
         if (!activeEditor) {
@@ -35,7 +51,10 @@ export class GetFilepathOfActiveEditorAgent extends Agent {
         if (isInvalidWorkspace(workspaceRelativeFilepath)) {
             return { state: 'Failed', message: "Invalid workspace" };
         }
-        this.storeKnowledgeItem("Current active editor filepath (relative to workspace root)", workspaceRelativeFilepath);
+        if (!this.arg1) {
+            return { state: 'FailedMissingArgument' };
+        }
+        this.storeKnowledgeItem(this.arg1, workspaceRelativeFilepath);
         return { state: 'Finished', message: "Stored current active editor filepath" };
     }
 }

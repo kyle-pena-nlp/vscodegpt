@@ -1,5 +1,7 @@
 export const CONSTANTS = {
     "extname": "vscode-gpt",
+    "exttitle": "Spicy Pepper's VSCode Extension For ChatGPT",
+    "exticon": "",
     "always_refuse_to_read_patterns": [
 
         // keys

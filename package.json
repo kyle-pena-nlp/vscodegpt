@@ -66,6 +66,14 @@
       {
         "command": "vscode-gpt.giveSelectionCommand",
         "title": "Tell AI To Rewrite"
+      },
+      {
+        "command": "vscode-gpt.resetIsFirstRun",
+        "title": "Set AI IsFirstRun to true (for debugging / to see welcome screen)"
+      },
+      {
+        "command": "vscode-gpt.viewWelcomeScreen",
+        "title": "View Welcome Screen"
       }
     ],
     "menus": {

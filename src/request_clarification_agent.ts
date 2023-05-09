@@ -22,6 +22,21 @@ export class RequestClarificationAgent extends Agent {
         return `Request a clarification from a human being and store it in memory location key '${this.arg1}'`;
     }
 
+    shareKnowledgeWithBoss_impl(): void {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg1) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg1]));
+        return;
+    } 
+    
+    triggersReplan(): boolean {
+        return true;
+    }    
+
     async execute_impl(): Promise<AgentStatusReport> {
         try
         {

@@ -25,10 +25,29 @@ export class GetDirectoryStructureAgent extends Agent {
         return `Get the directory structure of '${this.arg1}' and store it in '${this.arg2}'`;
     }
     
+    shareKnowledgeWithBoss_impl() {
+        if (!this.boss) {
+            return;
+        }
+        if (!this.arg2) {
+            return;
+        }
+        this.boss.mergeInKnowledge(this.selectKnowledge([this.arg2]));
+        return;
+    }
+
+    triggersReplan(): boolean {
+        return false;
+    }
+
     async execute_impl(): Promise<AgentStatusReport> {
 
         if (!this.arg1) {
             return { state: 'FailedMissingArgument', message: "No workspace root relative directory provided" };
+        }
+
+        if (!this.arg2) {
+            return { state: 'FailedMissingArgument', message: "No memory location key provided" }; 
         }
 
         const absoluteFilepath = fromWorkspaceRelativeFilepath(this.arg1);
@@ -60,16 +79,12 @@ export class GetDirectoryStructureAgent extends Agent {
 
             const summaryString = JSON.stringify(summary);
 
-            if (!this.arg2) {
-                return { state: 'FailedInvalidArgument' };
-            }
-
             this.storeKnowledgeItem(this.arg2, summaryString);
 
             return { state: 'Finished' };
         }
         catch (exception) {
-            return { state: 'FailedUnspecifiedError', message: "Could not read entries in ${this.arg1}", debug: exception };
+            return { state: 'FailedUnspecifiedError', message: "Could not read entries in ${this.arg1} and store in ${this.arg2}", debug: exception };
         }
 
     }
