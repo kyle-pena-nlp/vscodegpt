@@ -14,24 +14,12 @@ export class WorkspaceConfiguration {
         return this.get_config_property<Array<string>>("AI_deny_read_patterns", []);
     }
 
-    async get_AI_allow_read_file_patterns() {
-        return this.get_config_property<Array<string>>("AI_allow_read_patterns", []);
-    }
-
     async add_AI_deny_read_file_pattern(pattern : string) {
         await this.append_to_config_property("AI_deny_read_patterns", pattern);
     }
 
-    async add_AI_allow_read_file_patterns(pattern : string) {
-        await this.append_to_config_property("AI_allow_read_patterns", pattern);
-    }
-
     async get_AI_deny_write_file_patterns() {
         return this.get_config_property<Array<string>>("AI_deny_write_patterns", []);
-    }
-
-    async get_AI_allow_write_file_patterns() {
-        return this.get_config_property<Array<string>>("AI_allow_write_patterns", []);
     }
 
     async add_AI_deny_write_file_pattern(pattern : string) {
@@ -42,24 +30,12 @@ export class WorkspaceConfiguration {
         await this.append_to_config_property("AI_allow_write_patterns", pattern);
     }
 
-    async get_AI_goals() {
-        return this.get_workspace_property<Array<AIGoal>>("AI_goals", []);
+    async get_AI_deny_execution_patterns() {
+        return this.get_config_property("AI_deny_execution_patterns", []);
     }
 
-    async add_AI_goal(goal : AIGoal) {
-        await this.append_to_workspace_property("AI_goals", goal);
-    }
-
-    async remove_AI_goal(id : string) {
-        await this.remove_from_workspace_property_by_id("AI_goals", id);
-    }
-
-    async get_is_first_run() {
-        return await this.get_config_property("first_run", true);
-    }
-
-    async set_is_first_run(value: boolean) {
-        await this.set_config_property("first_run", value);
+    async add_AI_deny_execution_patterns(pattern : string) {
+        return this.append_to_config_property("AI_deny_execution_patterns", pattern);
     }
 
     async get_auto_show_AI_command_panel() {
@@ -84,31 +60,6 @@ export class WorkspaceConfiguration {
 
     async set_apiKey(apiKey : string) {
         vscode.workspace.getConfiguration().set(`${CONSTANTS.extname}.apiKey`, apiKey);
-    }
-
-
-    async get_recommended_actions() {
-        return this.get_workspace_property<Array<AIAction>>('recommendedActions', [])
-    }
-
-    async add_recommended_action(action: AIAction) {
-        await this.append_to_workspace_property('recommendedActions', action)
-    }
-
-    async remove_recommended_action(id : string) {
-        await this.remove_from_workspace_property_by_id<AIAction>('recommendedActions', id);
-    }
-
-    async get_recommended_action_by_id(id : string) {
-        return await this.get_from_workspace_by_id<AIAction>('recommendedActions', id);
-    }
-
-    async get_command_execution_definitions() {
-        return this.context.workspaceState.get<Map<string,string>>('command_execution_definitions') || new Map<string,string>();
-    }
-
-    async get_command_execution_context() {
-        return this.context.workspaceState.get<Map<string,string>>('command_execution_context') || new Map<string,string>();
     }
 
     private async set_config_property(property : string, value: any) {

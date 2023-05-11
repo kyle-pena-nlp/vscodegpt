@@ -9,12 +9,40 @@ import { ProgressWindow } from "./progress_window";
 import { PROMPTS } from './prompts';
 import { Agent } from './agent';
 import { GoalPlanningAgent } from './goal_planning_agent';
+import { CONSTANTS } from "./constants";
 
 interface Advice extends HasID {
   advice: string
 };
 
 export class AIUserCommandHandler {
+    showAICommandPanel() {
+      throw new Error('Method not implemented.');
+    }
+    makeSelectionRecommendations() {
+      throw new Error('Method not implemented.');
+    }
+    analyzeSelection() {
+      throw new Error('Method not implemented.');
+    }
+    makeEditorRecommendations() {
+      throw new Error('Method not implemented.');
+    }
+    analyzeEditor() {
+      throw new Error('Method not implemented.');
+    }
+    makeFileRecommendations(uri: any) {
+      throw new Error('Method not implemented.');
+    }
+    analyzeFile(uri: any) {
+      throw new Error('Method not implemented.');
+    }
+    makeFolderRecommendations(uri: any) {
+      throw new Error('Method not implemented.');
+    }
+    analyzeFolder(uri: any) {
+      throw new Error('Method not implemented.');
+    }
 
     private workspace_configuration : WorkspaceConfiguration;
     private ai_summarization_service : AISummarizationService;
@@ -120,6 +148,33 @@ export class AIUserCommandHandler {
       throw new Error('Method not implemented.');
     }
 
+    async setApiKey() {
+      const looksLikeOpenAIApiKey = (input : string) => {
+        input = input.trim();
+        if (input.length == 0) {
+          return "Must be non-empty";
+        }
+        if (input.length == 0) {
+          return "Must be non-empty";
+        }
+        if (!(input.startsWith("sk-") || input.startsWith("pk-"))) {
+          return "OpenAI API Keys start with sk- or pk-"
+        }        
+      }
+      this.showInputBox("OpenAI API Key", "Enter an Open API Key", "", looksLikeOpenAIApiKey).then((apiKey) => {
+        if (apiKey) {
+          this.workspace_configuration.set_apiKey(apiKey);
+        }
+      })
+    }
+
+    async pickModel() {
+      const selectedModel = await vscode.window.showQuickPick(CONSTANTS.models, { placeHolder: `Pick your preferred AI model.  ${CONSTANTS.recommendedModel} recommended.` } as vscode.QuickPickOptions);
+      if (selectedModel) {
+        this.workspace_configuration.set_AI_model(selectedModel);
+      }
+    }
+
     private async getCurrentEditorUri() : Promise<vscode.Uri|null> {
       const textEditor = vscode.window.activeTextEditor;
       if (!textEditor) {
@@ -153,14 +208,21 @@ export class AIUserCommandHandler {
         const defaultTitle = "Give the AI a command."
         const defaultPrompt = "Tell me what to do."
         const defaultPlaceholder = "Write a function that..."
-        const result = await vscode.window.showInputBox({ 
-            title : title || defaultTitle, 
-            prompt: prompt || defaultPrompt, 
-            placeholder : placeholder || defaultPlaceholder, 
-            ignoreFocusOut: false, 
-            validateInput: validateInput } as vscode.InputBoxOptions);
+        const result = this.showInputBox(
+          title || defaultTitle, 
+          prompt || defaultPrompt, 
+          placeholder || defaultPlaceholder, 
+          validateInput);
         return result
     }
 
-    
+    private async showInputBox(title : string, prompt : string, placeholder : string, validateInput : (input: string) => string|undefined) {
+      const result = await vscode.window.showInputBox({ 
+          title : title, 
+          prompt: prompt, 
+          placeholder : placeholder, 
+          ignoreFocusOut: false, 
+          validateInput: validateInput } as vscode.InputBoxOptions);
+      return result
+    }
 }

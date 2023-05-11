@@ -16,102 +16,99 @@ const logExceptions = (fn: (...args : any[]) => Promise<void>) => async (...args
 // I give you fire.
 export async function activate(context: vscode.ExtensionContext) {
 
-    const workspace_configuration = new WorkspaceConfiguration(context);
-
-
-    let startAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.startAIassistant`, logExceptions(async () => {
-      //ai_assistant_worker_background_process.start();
-    }));    
-
-    let stopAIassistantCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.stopAIassistant`, logExceptions(async () => {
-      //await ai_assistant_worker_background_process.stop();
-    }));        
-
-    // Let the user pcik the preferred model
-    let pickModelCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.pickModel`, logExceptions(async () => {
-      const selectedModel = await vscode.window.showQuickPick(CONSTANTS.models, { placeHolder: `Pick your preferred AI model.  ${CONSTANTS.recommendedModel} recommended.` } as vscode.QuickPickOptions);
-      if (selectedModel) {
-        workspace_configuration.set_AI_model(selectedModel);
-      }
-    }));
-    
-    // idea: recently issued commands show up as context menu items
+    // idea: recently issued commands re-appear up as context menu items?
 
     const userCommandHandler = new AIUserCommandHandler(context);
 
-    let giveFolderCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveFolderCommand`, logExceptions(async (uri) => {
+    // Let the user pcik the preferred model
+    const pickModelCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.pickModel`, logExceptions(async () => {
+      await userCommandHandler.pickModel();
+    }));
+    const giveFolderCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveFolderCommand`, logExceptions(async (uri) => {
         console.debug(uri);
         await userCommandHandler.giveFolderCommand(uri);
     }));
-
-    let addFolderAdviceCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.addFolderAdvice`, logExceptions(async (uri) => {
-      await userCommandHandler.addFolderAdvice(uri);
-    }));
-
-    let refreshFolderSummaryCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.refreshFolderSummary`, logExceptions(async (uri) => {
-      await userCommandHandler.refreshFolderSummary(uri);
-    }));    
+    const analyzeFolderCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.analyzeFolder`, logExceptions(async (uri) => {
+      await userCommandHandler.analyzeFolder(uri);
+    })); 
+    const makeFolderRecommendationsCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.makeFolderRecommendations`, logExceptions(async (uri) => {
+      await userCommandHandler.makeFolderRecommendations(uri);
+    })); 
 
 
-    let giveFileCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveFileCommand`, logExceptions(async (uri) => {
+    const giveFileCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveFileCommand`, logExceptions(async (uri) => {
       await userCommandHandler.giveFileCommand(uri);
     }));
-
-    let addFileAdviceCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.addFileAdvice`, logExceptions(async (uri) => {
-      await userCommandHandler.addFileAdvice(uri);
-    }));
-
-    let refreshFileSummaryCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.refreshFileSummary`, logExceptions(async (uri) => {
-      await userCommandHandler.refreshFileSummary(uri);
+    const analyzeFileCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.analyzeFile`, logExceptions(async (uri) => {
+      await userCommandHandler.analyzeFile(uri);
+    }));     
+    const makeFileRecommendationsCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.makeFileRecommendations`, logExceptions(async (uri) => {
+      await userCommandHandler.makeFileRecommendations(uri);
     })); 
     
 
-    let giveEditorCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveEditorCommand`, logExceptions(async () => {
+    const giveEditorCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveEditorCommand`, logExceptions(async () => {
       await userCommandHandler.giveEditorCommand();
     }));
-
-    let addEditorAdviceCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.addEditorAdvice`, logExceptions(async () => {
-      await userCommandHandler.addEditorAdvice();
-    }));
-
-    let refreshEditorSummaryCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.refreshEditorSummary`, logExceptions(async () => {
-      await userCommandHandler.refreshEditorSummary();
-    }));   
+    const analyzeEditorCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.analyzeEditor`, logExceptions(async () => {
+      await userCommandHandler.analyzeEditor();
+    })); 
+    const makeEditorRecommendationsCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.makeEditorRecommendations`, logExceptions(async () => {
+      await userCommandHandler.makeEditorRecommendations();
+    }));       
 
 
-    let giveSelectionCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveSelectionCommand`, logExceptions(async () => {
+    const giveSelectionCommandCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.giveSelectionCommand`, logExceptions(async () => {
       await userCommandHandler.giveSelectionCommand();
     }));
+    const analyzeSelectionCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.analyzeSelection`, logExceptions(async () => {
+      await userCommandHandler.analyzeSelection();
+    }));
+    const makeSelectionRecommendationsCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.makeSelectionRecommendations`, logExceptions(async () => {
+      await userCommandHandler.makeSelectionRecommendations();
+    }));    
 
-    let resetIsFirstRunCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.resetIsFirstRun`, logExceptions( async () => {
+
+    const resetIsFirstRunCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.resetIsFirstRun`, logExceptions( async () => {
       await resetIsFirstRun(context);
     }));
 
-    let viewWelcomeScreenCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.viewWelcomeScreen`, logExceptions( async () => {
+    const viewWelcomeScreenCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.viewWelcomeScreen`, logExceptions( async () => {
       await viewWelcomeScreen();
     }));    
 
+    const setAPIKeyCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.setAPIKeyCommand`, logExceptions(async () => {
+      await userCommandHandler.setApiKey();
+    }));
+
+    const showAICommandPanelCommand = vscode.commands.registerCommand(`${CONSTANTS.extname}.showAICommandPanel`, logExceptions(async () => {
+      await userCommandHandler.showAICommandPanel();
+    }));    
+
   
-  context.subscriptions.push(startAIassistantCommand);
-  context.subscriptions.push(stopAIassistantCommand);
 	context.subscriptions.push(pickModelCommand);
+	context.subscriptions.push(setAPIKeyCommand);  
+  context.subscriptions.push(resetIsFirstRunCommand);
+  context.subscriptions.push(viewWelcomeScreenCommand);  
+  context.subscriptions.push(showAICommandPanelCommand);     
 
   context.subscriptions.push(giveFolderCommandCommand);
-  context.subscriptions.push(addFolderAdviceCommand);
-  context.subscriptions.push(refreshFolderSummaryCommand);
+  context.subscriptions.push(analyzeFolderCommand);
+  context.subscriptions.push(makeFolderRecommendationsCommand);
 
   context.subscriptions.push(giveFileCommandCommand);
-  context.subscriptions.push(addFileAdviceCommand);
-  context.subscriptions.push(refreshFileSummaryCommand);  
+  context.subscriptions.push(analyzeFileCommand);
+  context.subscriptions.push(makeFolderRecommendationsCommand);  
 
   context.subscriptions.push(giveEditorCommandCommand);
-  context.subscriptions.push(addEditorAdviceCommand);
-  context.subscriptions.push(refreshEditorSummaryCommand);    
+  context.subscriptions.push(analyzeEditorCommand);
+  context.subscriptions.push(makeEditorRecommendationsCommand);  
+  
+  context.subscriptions.push(giveSelectionCommandCommand);
+  context.subscriptions.push(analyzeSelectionCommand);
+  context.subscriptions.push(makeSelectionRecommendationsCommand); 
+  
 
-  context.subscriptions.push(giveEditorCommandCommand);
-
-  context.subscriptions.push(resetIsFirstRunCommand);
-  context.subscriptions.push(viewWelcomeScreenCommand);
 
 
   maybeDoFirstRun(context);

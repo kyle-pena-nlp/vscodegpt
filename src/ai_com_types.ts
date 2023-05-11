@@ -1,3 +1,12 @@
+export interface Hashable {
+    hash() : string
+}
+
+export interface HashChainable extends Hashable {
+    hash(): string
+    dependencies(): Hashable[]
+}
+
 export interface HasID {
     id: string
 };

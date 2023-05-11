@@ -15,69 +15,92 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
+
       {
-        "command": "vscode-gpt.startAIassistant",
-        "title": "Start generating suggestions"
-      },
-      {
-        "command": "vscode-gpt.stopAIassistant",
-        "title": "Stop generating suggestions"
-      },
-      {
-        "command": "vscode-gpt.pickModel",
-        "title": "Pick model"
+        "command": "vscode-gpt.makeFolderRecommendations",
+        "title": "Make some recommendations"
       },
       {
         "command": "vscode-gpt.giveFolderCommand",
         "title": "Give AI Command"
       },
       {
-        "command": "vscode-gpt.addFolderAdvice",
-        "title": "Give AI Advice"
-      },
-      {
-        "command": "vscode-gpt.refreshFolderSummary",
+        "command": "vscode-gpt.analyzeFolder",
         "title": "Tell AI To Read This"
       },
+      {
+        "command": "vscode-gpt.showAICommandPanel",
+        "title": "Show AI Command Panel"
+      },
+
+
+
+      {
+        "command": "vscode-gpt.makeFileRecommendations",
+        "title": "Make some recommendations"
+      },      
       {
         "command": "vscode-gpt.giveFileCommand",
         "title": "Give AI Command"
       },
       {
-        "command": "vscode-gpt.addFileAdvice",
-        "title": "Give AI Advice"
-      },
-      {
-        "command": "vscode-gpt.refreshFileSummary",
+        "command": "vscode-gpt.analyzeFile",
         "title": "Tell AI To Read This"
       },
+
+      {
+        "command": "vscode-gpt.makeEditorRecommendations",
+        "title": "Make some recommendations"
+      },   
       {
         "command": "vscode-gpt.giveEditorCommand",
         "title": "Give AI Command"
       },
       {
-        "command": "vscode-gpt.addEditorAdvice",
-        "title": "Give AI Advice"
-      },
-      {
-        "command": "vscode-gpt.refreshEditorSummary",
+        "command": "vscode-gpt.analyzeEditor",
         "title": "Tell AI To Read This"
       },
+
+
+      {
+        "command": "vscode-gpt.makeSelectionRecommendations",
+        "title": "Make some recommendations"
+      },  
       {
         "command": "vscode-gpt.giveSelectionCommand",
         "title": "Tell AI To Rewrite"
       },
       {
+        "command": "vscode-gpt.analyzeSelection",
+        "title": "Tell AI To Rewrite"
+      },   
+      
+      
+      {
         "command": "vscode-gpt.resetIsFirstRun",
-        "title": "Set AI IsFirstRun to true (for debugging / to see welcome screen)"
+        "title": "Reset IsFirstRun to true (for debugging / to see welcome screen)"
       },
       {
         "command": "vscode-gpt.viewWelcomeScreen",
         "title": "View Welcome Screen"
-      }
+      },
+      {
+        "command": "vscode-gpt.setAPIKey",
+        "title": "Set API Key"
+      },
+      {
+        "command": "vscode-gpt.pickModel",
+        "title": "Pick model"
+      }            
     ],
     "menus": {
       "explorer/context": [
+
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "vscode-gpt.makeFolderRecommendations",
+          "group": "navigation@1"
+        },        
         {
           "when": "explorerResourceIsFolder",
           "command": "vscode-gpt.giveFolderCommand",
@@ -85,13 +108,20 @@
         },
         {
           "when": "explorerResourceIsFolder",
-          "command": "vscode-gpt.addFolderAdvice",
-          "group": "navigation@2"
+          "command": "vscode-gpt.analyzeFolder",
+          "group": "navigation@1"
         },
         {
           "when": "explorerResourceIsFolder",
-          "command": "vscode-gpt.refreshFolderSummary",
-          "group": "navigation@3"
+          "command": "vscode-gpt.showAICommandPanel",
+          "group": "navigation@1"
+        },        
+
+
+        {
+          "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
+          "command": "vscode-gpt.makeFileRecommendations",
+          "group": "navigation@1"
         },
         {
           "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
@@ -100,16 +130,27 @@
         },
         {
           "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
-          "command": "vscode-gpt.addFileAdvice",
-          "group": "navigation@2"
+          "command": "vscode-gpt.analyzeFile",
+          "group": "navigation@1"
         },
         {
           "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
-          "command": "vscode-gpt.refreshFileSummary",
-          "group": "navigation@3"
-        }
+          "command": "vscode-gpt.showAICommandPanel",
+          "group": "navigation@1"
+        }        
       ],
       "editor/context": [
+
+        {
+          "command": "vscode-gpt.showAICommandPanel",
+          "group": "navigation@1"
+        },
+
+        {
+          "when": "resourceScheme == 'file' && !editorHasSelection",
+          "command": "vscode-gpt.makeEditorRecommendations",
+          "group": "navigation@1"
+        },
         {
           "when": "resourceScheme == 'file' && !editorHasSelection",
           "command": "vscode-gpt.giveEditorCommand",
@@ -117,19 +158,25 @@
         },
         {
           "when": "resourceScheme == 'file' && !editorHasSelection",
-          "command": "vscode-gpt.addEditorAdvice",
-          "group": "navigation@2"
-        },
-        {
-          "when": "resourceScheme == 'file' && !editorHasSelection",
-          "command": "vscode-gpt.refreshEditorSummary",
+          "command": "vscode-gpt.analyzeEditor",
           "group": "navigation@3"
         },
+
+        {
+          "when": "editorHasSelection",
+          "command": "vscode-gpt.makeSelectionRecommendations",
+          "group": "navigation@1"
+        },       
         {
           "when": "editorHasSelection",
           "command": "vscode-gpt.giveSelectionCommand",
           "group": "navigation@1"
-        }
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "vscode-gpt.analyzeSelection",
+          "group": "navigation@1"
+        }        
       ]
     },
     "configuration": {
@@ -151,35 +198,20 @@
           "default": true,
           "description": "Auto-show the command panel when the workspace is opened"
         },
-        "vscode-gpt.AI_goals": {
-          "type": "array",
-          "default": [],
-          "description": "Goals for your workspace"
-        },
         "vscode-gpt.AI_deny_read_patterns": {
           "type": "array",
           "default": [],
           "description": "Files and directories that AI is NOT permitted to read"
-        },
-        "vscode-gpt.AI_allow_read_patterns": {
-          "type": "array",
-          "default": [],
-          "description": "Files and directories that AI is permitted to read"
         },
         "vscode-gpt.AI_deny_write_patterns": {
           "type": "array",
           "default": [],
           "description": "Files and directories that AI is permitted to write to"
         },
-        "vscode-gpt.AI_allow_write_patterns": {
+        "vscode-gpt.AI_deny_execute_patterns": {
           "type": "array",
           "default": [],
-          "description": "Files and directories that AI is NOT permitted to write to"
-        },
-        "vscode-gpt.first_run": {
-          "type": "boolean",
-          "default": true,
-          "description": "Has, the first-time initialization completed?"
+          "description": "Files and directories that AI is permitted to write to"
         }
       }
     }
