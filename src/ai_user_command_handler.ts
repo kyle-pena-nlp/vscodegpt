@@ -67,7 +67,8 @@ export class AIUserCommandHandler {
 
 
         const progressWindow = new ProgressWindow("Replacing selected code");
-        const replaceCodePlanningAgent = new GoalPlanningAgent("The user would like you to replace the currently selected code with modified code.  This is how they would like you to modify the code: '" + goal + "'", null, null, this.context, progressWindow);
+        const goalPrompt = "The user would like you to replace the currently selected code with modified code.  This is how they would like you to modify the code: '" + goal + "'";
+        const replaceCodePlanningAgent = new GoalPlanningAgent(goalPrompt, null, null, null, this.context, progressWindow);
         const activeEditorFilepath = await this.getCurrentEditorUri();
         if (!activeEditorFilepath) {
           return;
@@ -116,7 +117,7 @@ export class AIUserCommandHandler {
           return;
         }
         const progressWindow = new ProgressWindow("Inserting code at current position");
-        const replaceCodePlanningAgent = new GoalPlanningAgent(goal, null, null, this.context, progressWindow);
+        const replaceCodePlanningAgent = new GoalPlanningAgent(goal, null, null, null, this.context, progressWindow);
         await replaceCodePlanningAgent.execute()
       }
       catch (exception) {

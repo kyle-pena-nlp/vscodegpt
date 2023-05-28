@@ -55,11 +55,14 @@ export class WorkspaceConfiguration {
     }
 
     async get_apiKey() {
+        if (process.env.testing__apiKey !== undefined) {
+            return process.env.testing__apiKey;
+        }
         return vscode.workspace.getConfiguration().get(`${CONSTANTS.extname}.apiKey`) as string;
     }
 
     async set_apiKey(apiKey : string) {
-        vscode.workspace.getConfiguration().set(`${CONSTANTS.extname}.apiKey`, apiKey);
+        await this.set_config_property('apiKey', apiKey);
     }
 
     private async set_config_property(property : string, value: any) {

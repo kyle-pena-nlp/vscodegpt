@@ -32,6 +32,7 @@ export interface AICommand {
     verb : string
     arg1 : string|null
     arg2 : string|null
+    arg3 : string|null
 };
 
 export interface AICommandExecutionResult {

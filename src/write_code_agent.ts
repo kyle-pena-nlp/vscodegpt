@@ -9,8 +9,8 @@ export class WriteCodeAgent extends Agent {
 
     private ai_prompt_service : AIPromptService;
 
-    constructor(arg1 : string|null, arg2: string|null, boss: Agent, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
-        super(arg1, arg2, boss, context, progressWindow);
+    constructor(arg1 : string|null, arg2: string|null, arg3 : string|null, boss: Agent, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
+        super(arg1, arg2, arg3, boss, context, progressWindow);
         this.ai_prompt_service = new AIPromptService(context);
     }
 

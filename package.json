@@ -15,92 +15,82 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-
       {
         "command": "vscode-gpt.makeFolderRecommendations",
-        "title": "Make some recommendations"
+        "title": "ChatGPT Agent: Make some recommendations"
       },
       {
         "command": "vscode-gpt.giveFolderCommand",
-        "title": "Give AI Command"
+        "title": "ChatGPT Agent: ChatGPT Agent: Give AI Command"
       },
       {
         "command": "vscode-gpt.analyzeFolder",
-        "title": "Tell AI To Read This"
+        "title": "ChatGPT Agent: Ask Question"
       },
-      {
-        "command": "vscode-gpt.showAICommandPanel",
-        "title": "Show AI Command Panel"
-      },
-
-
-
       {
         "command": "vscode-gpt.makeFileRecommendations",
-        "title": "Make some recommendations"
-      },      
+        "title": "ChatGPT Agent: Ask for recommendations"
+      },
       {
         "command": "vscode-gpt.giveFileCommand",
-        "title": "Give AI Command"
+        "title": "ChatGPT Agent: Give Command"
       },
       {
         "command": "vscode-gpt.analyzeFile",
-        "title": "Tell AI To Read This"
+        "title": "ChatGPT Agent: Ask Question"
       },
-
       {
         "command": "vscode-gpt.makeEditorRecommendations",
-        "title": "Make some recommendations"
-      },   
+        "title": "ChatGPT Agent: Ask for recommendations"
+      },
       {
         "command": "vscode-gpt.giveEditorCommand",
-        "title": "Give AI Command"
+        "title": "ChatGPT Agent: Give Command"
       },
       {
         "command": "vscode-gpt.analyzeEditor",
-        "title": "Tell AI To Read This"
+        "title": "ChatGPT Agent: Ask Question"
       },
-
-
       {
         "command": "vscode-gpt.makeSelectionRecommendations",
-        "title": "Make some recommendations"
-      },  
+        "title": "ChatGPT Agent: Ask for recommendations"
+      },
       {
         "command": "vscode-gpt.giveSelectionCommand",
-        "title": "Tell AI To Rewrite"
+        "title": "ChatGPT Agent: Replace/Modify Selected Code"
       },
       {
         "command": "vscode-gpt.analyzeSelection",
-        "title": "Tell AI To Rewrite"
-      },   
-      
-      
+        "title": "ChatGPT Agent: Ask Question"
+      },
       {
-        "command": "vscode-gpt.resetIsFirstRun",
-        "title": "Reset IsFirstRun to true (for debugging / to see welcome screen)"
+        "command": "vscode-gpt.showAICommandPanel",
+        "title": "ChatGPT Agent:Show AI Command Panel"
       },
       {
         "command": "vscode-gpt.viewWelcomeScreen",
-        "title": "View Welcome Screen"
+        "title": "ChatGPT Agent: View Welcome Screen"
       },
       {
         "command": "vscode-gpt.setAPIKey",
-        "title": "Set API Key"
+        "title": "ChatGPT Agent: Set API Key"
       },
       {
         "command": "vscode-gpt.pickModel",
-        "title": "Pick model"
-      }            
+        "title": "ChatGPT Agent: Pick model"
+      },
+      {
+        "command": "vscode-gpt.resetIsFirstRun",
+        "title": "ChatGPT Agent: Reset IsFirstRun to true (for debugging / to see welcome screen)"
+      }
     ],
     "menus": {
       "explorer/context": [
-
         {
           "when": "explorerResourceIsFolder",
           "command": "vscode-gpt.makeFolderRecommendations",
           "group": "navigation@1"
-        },        
+        },
         {
           "when": "explorerResourceIsFolder",
           "command": "vscode-gpt.giveFolderCommand",
@@ -115,9 +105,7 @@
           "when": "explorerResourceIsFolder",
           "command": "vscode-gpt.showAICommandPanel",
           "group": "navigation@1"
-        },        
-
-
+        },
         {
           "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
           "command": "vscode-gpt.makeFileRecommendations",
@@ -137,15 +125,13 @@
           "when": "resourceScheme == 'file' && !explorerResourceIsFolder",
           "command": "vscode-gpt.showAICommandPanel",
           "group": "navigation@1"
-        }        
+        }
       ],
       "editor/context": [
-
         {
           "command": "vscode-gpt.showAICommandPanel",
           "group": "navigation@1"
         },
-
         {
           "when": "resourceScheme == 'file' && !editorHasSelection",
           "command": "vscode-gpt.makeEditorRecommendations",
@@ -161,12 +147,11 @@
           "command": "vscode-gpt.analyzeEditor",
           "group": "navigation@3"
         },
-
         {
           "when": "editorHasSelection",
           "command": "vscode-gpt.makeSelectionRecommendations",
           "group": "navigation@1"
-        },       
+        },
         {
           "when": "editorHasSelection",
           "command": "vscode-gpt.giveSelectionCommand",
@@ -176,7 +161,7 @@
           "when": "editorHasSelection",
           "command": "vscode-gpt.analyzeSelection",
           "group": "navigation@1"
-        }        
+        }
       ]
     },
     "configuration": {
@@ -243,7 +228,9 @@
   "dependencies": {
     "@types/uuid": "^9.0.1",
     "@vscode/webview-ui-toolkit": "^1.2.2",
+    "axios": "^1.4.0",
     "file-type": "^18.3.0",
+    "gpt-3-encoder": "^1.1.4",
     "minimatch": "^5.1.2",
     "openai": "^3.2.1",
     "text-extensions": "^2.4.0",

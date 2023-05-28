@@ -39,10 +39,11 @@ export class GoalPlanningAgent extends Agent {
         ])
     };
 
-    constructor(arg1 : string, arg2 : string | null, boss: Agent|null, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
-        super(arg1, arg2, boss, context, progressWindow);   
+    constructor(arg1 : string | null, arg2 : string | null, arg3 : string|null,  boss: Agent|null, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
+        super(arg1, arg2, arg3, boss, context, progressWindow);   
         this.ai_prompt_service = new AIPromptService(this.context);
     }
+
 
     purpose() : string {
         return `${this.arg1}`;
@@ -62,35 +63,36 @@ export class GoalPlanningAgent extends Agent {
         
     triggersReplan(): boolean {
         return false;
-    }    
+    }
 
     async execute_impl() : Promise<AgentStatusReport> {
 
         this.progressWindow.open();
         let currentMinionIndex = -1;
-        let needsPlanning = true;
+        let needsPlanning = this.unstartedMinions().length == 0;
         let maxMinionSteps = 50; // TODO: make me configuration.
 
         while(true) {
 
             // Move to the next minion
-            currentMinionIndex += 1;
+            currentMinionIndex += 1;            
 
+            // if too many steps executed, halt.
             if (currentMinionIndex >= maxMinionSteps) {
                 console.debug("Exceeded max execution steps.")
                 break;
             }
             
+            // if needs planning, do planning and replace rest of plan
             if (needsPlanning) {
-
-                // Use this knowledge to create a new plan to finish executing the goal
+                
                 const newMinions = await this.createPlan();
                 if (this.isFailure(newMinions)) {
                     return { state: newMinions };
                 }
                 
-                // If there is nothing left to be done, finish.
-                // TODO: explitly check for 'ACHIEVED', 'REFUSE', 'IMPOSSIBLE' responses
+                // If no new planning needed, exit.
+                // TODO: explitly check for 'ACHIEVED', 'REFUSE', 'IMPOSSIBLE' responses.  Make these return statuses?
                 if (newMinions.length == 0) {
                     break;
                 }
@@ -99,10 +101,8 @@ export class GoalPlanningAgent extends Agent {
                 this.minions.splice(currentMinionIndex, this.minions.length - (currentMinionIndex + 1), ...newMinions);
             }
 
-            // Get the first new minion
+            // Get the minion to execute
             const currentMinion = this.minions.at(currentMinionIndex)!;
-
-            needsPlanning = false;
 
             // If there are no new minions to execute, trigger one last replan to confirm completion of plan
             if (!currentMinion) {
@@ -126,6 +126,7 @@ export class GoalPlanningAgent extends Agent {
                 continue;
             }
 
+            // some minions by their nature should always trigger a replan
             needsPlanning = needsPlanning || currentMinion.triggersReplan();
 
             currentMinion.shareKnowledgeWithBoss();
@@ -235,7 +236,7 @@ export class GoalPlanningAgent extends Agent {
         for (const parsedResponse of parsedResponses) {
             const agentClass = nodeMetadata.getAgentCtor(parsedResponse.verb);
             if (agentClass) {
-                const agent = new agentClass(parsedResponse.arg1, parsedResponse.arg2, this, this.context, this.progressWindow);
+                const agent = new agentClass(parsedResponse.arg1, parsedResponse.arg2, parsedResponse.arg3, this, this.context, this.progressWindow);
                 minions.push(agent)
             }
         }

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { CONSTANTS } from './constants';
 import { WorkspaceConfiguration } from './workspace_configuration';
+import { haveUserEnterAPIKey, validateAPIKey } from './enter_api_key_ui';
 
 // TODO: marketplace preview screen
 // TODO: github link
@@ -133,17 +134,33 @@ export function viewWelcomeScreen() {
     panel.webview.html = getWelcomeScreenContent();
 }
 
-const doFirstRun = async () => {
-    viewWelcomeScreen();
+const doFirstRun = async (context : vscode.ExtensionContext) => {
+    await maybePromptForAPIKey(context);
+    //viewWelcomeScreen();
 };
+
+async function maybePromptForAPIKey(context : vscode.ExtensionContext) {
+    const workspaceConfiguration = new WorkspaceConfiguration(context);
+    const apiKey = await workspaceConfiguration.get_apiKey();
+    const validationResult = await validateAPIKey(apiKey)
+    if (validationResult !== 'valid') {
+        await promptUserForAPIKey(context);
+    }
+    //const valid = validateAPIKey(apiKey);
+}
+
+async function promptUserForAPIKey(context : vscode.ExtensionContext) {
+    await haveUserEnterAPIKey(context);
+}
 
 export const maybeDoFirstRun = async (context : vscode.ExtensionContext) => {
     // Check if the extension is being activated for the first time
     const isFirstRun = !context.globalState.get('isFirstRun');
+    const testingFirstRun = process.env.testing__isFirstRun;
 
-    if (isFirstRun) {
+    if (isFirstRun || testingFirstRun) {
         //context.globalState.update('isFirstRun', false);
-        await doFirstRun();
+        await doFirstRun(context);
     }
 };
 

@@ -18,8 +18,8 @@ export class ModifyStoredCodeAgent extends Agent {
         ])
     };    
 
-    constructor(arg1 : string|null, arg2: string|null, boss : Agent|null, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
-        super(arg1, arg2, boss, context, progressWindow);
+    constructor(arg1 : string|null, arg2: string|null, arg3 : string|null,  boss : Agent|null, context: vscode.ExtensionContext, progressWindow : ProgressWindow) {
+        super(arg1, arg2, arg3, boss, context, progressWindow);
         this.ai_prompt_service = new AIPromptService(this.context);
     }
 

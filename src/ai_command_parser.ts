@@ -37,7 +37,8 @@ export class AICommandParser {
         return { 
             verb: command_arr[0],
             arg1: command_arr?.[1],
-            arg2: command_arr?.[2]
+            arg2: command_arr?.[2],
+            arg3: command_arr?.[3]
         } as AICommand;
     }
 
